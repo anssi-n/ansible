@@ -1,0 +1,59 @@
+---
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: JoinConfiguration
+
+discovery:
+  bootstrapToken:
+    token: "{{ join_token }}"
+    apiServerEndpoint: "{{ api_server_endpoint }}"
+    caCertHashes:
+      - "{{ ca_cert_hash }}"
+
+{% if cert_key is defined %}
+controlPlane:
+  localAPIEndpoint:
+    advertiseAddress: {{ ansible_host }}
+    bindPort: 6443
+  certificateKey: "{{ cert_key }}"
+{% endif %}
+
+nodeRegistration:
+  kubeletExtraArgs:
+    - name: node-ip
+      value: {{ ansible_host }}
+
+networking:
+  podSubnet: "{{ pod_network_cidr }}"
+  serviceSubnet: "{{ service_network_cidr }}"
+
+apiServer:
+  certSANs: {{ apiserver_cert_extra_sans | safe | replace('\'', '\"') }}
+  extraArgs:
+    - name: bind-address
+      value: "0.0.0.0"
+
+controllerManager:
+  extraArgs:
+    - name: bind-address
+      value: "0.0.0.0"
+
+scheduler:
+  extraArgs:
+    - name: bind-address
+      value: "0.0.0.0"
+
+etcd:
+  local:
+    serverCertSANs:
+      - "{{ ansible_host }}"
+    peerCertSANs:
+      - "{{ ansible_host }}"
+    extraArgs:
+      - name: listen-client-urls
+        value: "https://0.0.0.0:2379"
+      - name: listen-peer-urls
+        value: "https://0.0.0.0:2380"
+      - name: advertise-client-urls
+        value: "https://{{ ansible_host }}:2379"
+      - name: initial-advertise-peer-urls
+        value: "https://{{ ansible_host }}:2380"

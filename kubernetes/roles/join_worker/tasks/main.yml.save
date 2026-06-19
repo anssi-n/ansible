@@ -1,0 +1,25 @@
+---
+- name: Check if join command is already executed
+  ansible.builtin.stat:
+    path: /etc/kubernetes/pki
+  register: joined
+
+- debug:
+    var: joined
+
+
+- block:
+
+  - name: Set first control plane node
+    ansible.builtin.set_fact:
+      first_control_plane_node: "{{ groups['control_plane_nodes'][0] }}"
+
+
+  - name: Join worker node
+    ansible.builtin.command:
+      cmd: "{{ hostvars[first_control_plane_node]['join_worker_command'] }}"
+      creates: /etc/kubernetes/pki
+    register: join_result
+    when: 
+
+  when: hostvars[first_control_plane_node]['join_worker_command'] is defined and not ( joined.stat.isdir is defined and joined.stat.isdir )

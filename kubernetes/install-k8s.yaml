@@ -1,0 +1,75 @@
+---
+- name: Install and setup HAProxy on loadbalancer
+  hosts: lb_node
+  become: true
+  tags: [lb]
+
+  vars_files:
+    - k8s_vars.yaml
+
+  roles:
+    - role: lb_setup
+      install_kubectl: true
+
+- name: Install containerd cri, kubeadm, kubelet and kubectl to all nodes in cluster
+  hosts: k8s_cluster
+  become: true
+  tags: [setup]
+
+  vars_files:
+    - k8s_vars.yaml
+
+  roles:
+    - role: containerd
+      when: install_containerd | default(true) | bool
+    - role: kubeadm
+
+- name: Initialize first control plane node and install cilium cni
+  hosts: control_plane_nodes[0]
+  become: true
+  tags: [init_cluster]
+
+  vars_files:
+    - k8s_vars.yaml
+
+  roles:
+    - role: init_cluster
+      skip_kube_proxy: true
+      setup_kubeconfig_on_lb: true
+
+    - role: cilium
+      when: install_cilium | default(true) | bool
+
+- name: Join the rest of the control plane nodes to cluster
+  hosts: control_plane_nodes[1:]
+  become: true
+  tags: [join_control]
+
+  vars_files:
+    - k8s_vars.yaml
+
+  roles:
+    - role: join_control
+
+- name: Join all worker nodes to cluster
+  hosts: worker_nodes
+  become: true
+  tags: [join_worker]
+
+  vars_files:
+    - k8s_vars.yaml
+
+  roles:
+    - join_worker
+
+- name: Install extra software to cluster nodes
+  hosts: k8s_cluster
+  become: true
+  tags: [extra]
+
+  vars_files:
+    - k8s_vars.yaml
+
+  roles:
+    - role: gvisor
+      when: install_gvisor | default(false) | bool

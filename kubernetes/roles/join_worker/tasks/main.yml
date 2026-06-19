@@ -1,0 +1,41 @@
+---
+- name: Check if join command is already executed
+  ansible.builtin.stat:
+    path: /etc/kubernetes/pki
+  register: joined
+
+- name: Set primary control plane node
+  ansible.builtin.set_fact:
+    primary_control_plane_node: "{{ groups['control_plane_nodes'] | first }}"
+
+- block:
+
+  - name: Get join command from primary control plane node
+    ansible.builtin.command:
+      cmd: kubeadm token create --print-join-command
+    register: join_command_output
+    delegate_to:  "{{ primary_control_plane_node }}"
+    run_once: true
+
+  - ansible.builtin.set_fact:
+      join_worker_command: "{{ join_command_output.stdout }}"
+    run_once: true
+
+  - name: Get parameters from join command
+    ansible.builtin.set_fact:
+      join_token: "{{ (join_worker_command | split)[4] | trim }}"
+      api_server_endpoint: "{{ (join_worker_command | split)[2] | trim }}"
+      ca_cert_hash: "{{ (join_worker_command | split)[6] | trim }}"
+
+  - name: Create join config file
+    ansible.builtin.template:
+       src: kubeadm-join-config-template.j2
+       dest: /tmp/kubeadm-join-config.yaml
+
+  - name: Join worker node
+    ansible.builtin.command:
+      cmd: kubeadm join --config /tmp/kubeadm-join-config.yaml
+      creates: /etc/kubernetes/pki
+    register: worker_join
+
+  when: not ( joined.stat.isdir is defined and joined.stat.isdir )

@@ -1,0 +1,79 @@
+---
+- name: Install dependencies for adding repository
+  ansible.builtin.package:
+    name:
+      - ca-certificates
+      - curl
+    state: present
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Ensure keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Add Docker official repository
+  ansible.builtin.deb822_repository:
+    name: docker
+    types: [deb]
+    uris: "https://download.docker.com/linux/ubuntu"
+    suites: "{{ ansible_facts['distribution_release'] }}"
+    components: [stable]
+    signed_by: "https://download.docker.com/linux/ubuntu/gpg"
+    state: present
+
+- name: Install containerd
+  ansible.builtin.package:
+    name:
+      - containerd.io
+    state: present
+    update_cache: yes
+  register: pkg_install
+
+- name: Set was_installed variable
+  ansible.builtin.set_fact:
+    containerd_installed: "{{ pkg_install.changed }}"
+
+- name: Download cni plugings
+  ansible.builtin.get_url:
+    url: "https://github.com/containernetworking/plugins/releases/download/{{ cni_plugins_version }}/cni-plugins-linux-amd64-{{ cni_plugins_version }}.tgz"
+    dest: "/tmp/cni-plugins-linux-amd64-{{ cni_plugins_version }}.tgz"
+    checksum: "sha512:https://github.com/containernetworking/plugins/releases/download/{{ cni_plugins_version }}/cni-plugins-linux-amd64-{{ cni_plugins_version }}.tgz.sha512"
+
+- name: Create target directory for cni plugins
+  ansible.builtin.file:
+    path: "{{ cni_plugins_target_dir }}"
+    state: directory
+
+- name: Install cni plugings
+  ansible.builtin.unarchive:
+    src: "/tmp/cni-plugins-linux-amd64-{{ cni_plugins_version }}.tgz"
+    dest: "{{ cni_plugins_target_dir }}"
+    copy: false
+    creates: "{{ cni_plugins_target_dir }}/README.md"
+
+- block:
+
+  - name: Create default config for containerd
+    ansible.builtin.shell:
+      cmd: containerd config default > /etc/containerd/config.toml
+
+  - name: Set systemd cgroup driver
+    ansible.builtin.replace:
+      path: /etc/containerd/config.toml
+      regexp: "^( +)SystemdCgroup = false"
+      replace: "\\1SystemdCgroup = true"
+      backup: yes
+
+  - name: Set sandbox image version
+    ansible.builtin.replace:
+      path: /etc/containerd/config.toml
+      regexp: "^( +)(sandbox_image|sandbox) = .*"
+      replace: "\\1\\2 = '{{ containerd_sandbox_image }}'"
+
+  when: containerd_installed
+  notify: restart containerd

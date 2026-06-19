@@ -1,0 +1,93 @@
+---
+# Get control plane endpoint if there's more than one control plane node defined
+# Init config template checks if control_plane_endpoint var is defined and adds required fields
+
+- ansible.builtin.set_fact:
+    multiple_control_plane_nodes: "{{ groups['control_plane_nodes'] | length > 1 }}"
+
+- ansible.builtin.set_fact:
+    control_plane_endpoint: "{{ hostvars[groups['lb_node'][0]]['ansible_host'] }}"
+  when: multiple_control_plane_nodes
+
+# Create init config file from template
+- name: Create init config file
+  ansible.builtin.template:
+     src: kubeadm-init-config-template.j2
+     dest: /tmp/kubeadm-init-config.yaml
+
+- name: Run kubeadm init on primary control plane node
+  ansible.builtin.command:
+    cmd: kubeadm init --config /tmp/kubeadm-init-config.yaml --upload-certs
+    creates: /etc/kubernetes/pki
+  register: kubeadm_init_output
+
+## Get certficate key for joining other control plane nodes
+## Note! No longer needed. New certificate is generated and uploaded during join_control in order to decouple init_cluster and join_cluster roles
+#- ansible.builtin.set_fact:
+#    cert_key: "{{ kubeadm_init_output.stdout | regex_findall('--certificate-key\\s+([0-9a-fA-F]+)\\s+') | first | default('') }}"
+#  when: multiple_control_plane_nodes
+#  run_once: true
+
+# Setup kubeconfig for root user
+- name: Ensure ~/.kube directory exists
+  ansible.builtin.file:
+    path: ~/.kube
+    state: directory
+
+- name: Copy admin.conf to .kube directory
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: ~/.kube/config
+    remote_src: yes
+
+# Setup kubeconfig for vagrant user
+- name: Ensure ~/.kube directory exists
+  become: false
+  ansible.builtin.file:
+    path: ~/.kube
+    state: directory
+
+- name: Copy admin.conf to .kube directory
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/vagrant/.kube/config
+    remote_src: yes
+    owner: vagrant
+    group: vagrant
+
+- ansible.builtin.set_fact:
+    lb_node: "{{ groups['lb_node'] | default([]) | first | default('NA') }}"
+
+- name: Setup kubeconfig on lb node
+  block:
+
+  # Create ~/.kube dir for vagrant used in lb node: vagrant:vagrant
+  - name: Create directory for kubeconfig on loadbalancer node
+    become: false
+    ansible.builtin.file:
+      path: ~/.kube
+      state: directory
+      mode: "0775"
+    delegate_to: "{{ lb_node }}"
+
+  # Copy /etc/kubernetes/admin.conf from control plane node to ~/.kube/config on lb node vagrant:vagrant
+  - name: Copy admin.conf from primary control plane node to local machine
+    ansible.builtin.fetch:
+      src: /etc/kubernetes/admin.conf
+      dest: /tmp/
+      flat: true
+
+  - name: Copy admin.conf from local to loadbalancer node
+    become: false
+    ansible.builtin.copy:
+      src: /tmp/admin.conf
+      dest: ~/.kube/config
+    delegate_to: "{{ lb_node }}"
+
+  - name: Remove admin.conf from localhost
+    file:
+      path: /tmp/admin.conf
+      state: absent
+    delegate_to: localhost
+
+  when: setup_kubeconfig_on_lb and multiple_control_plane_nodes
