@@ -74,6 +74,9 @@ def get_inventory() -> Dict[str, Any]:
                 "_meta": {
                     "hostvars": {}
                 },
+                "etcd_nodes": {
+                    "hosts": []
+                },
                 "control_plane_nodes": {
                     "hosts": []
                 },
@@ -85,6 +88,7 @@ def get_inventory() -> Dict[str, Any]:
                 },
                 "k8s_cluster": {
                     "children": [
+                        "etcd_nodes",
                         "control_plane_nodes",
                         "worker_nodes"
                     ]
@@ -103,6 +107,8 @@ def get_inventory() -> Dict[str, Any]:
         for node, ip in nodes:
             if "lb" in category:
                 inventory["lb_node"]["hosts"].append(node)
+            elif "etcd" in category:
+                inventory["etcd_nodes"]["hosts"].append(node)
             elif "control" in category:
                 inventory["control_plane_nodes"]["hosts"].append(node)
             elif "worker" in category:

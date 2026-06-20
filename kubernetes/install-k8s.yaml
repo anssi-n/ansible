@@ -24,6 +24,17 @@
       when: install_containerd | default(true) | bool
     - role: kubeadm
 
+- name: Setup external etcd cluster
+  hosts: etcd_nodes
+  become: true
+  tags: [etcd]
+
+  vars_files:
+    - k8s_vars.yaml
+
+  roles:
+    - setup_etcd_cluster
+
 - name: Initialize first control plane node and install cilium cni
   hosts: control_plane_nodes[0]
   become: true
@@ -34,9 +45,6 @@
 
   roles:
     - role: init_cluster
-      skip_kube_proxy: true
-      setup_kubeconfig_on_lb: true
-
     - role: cilium
       when: install_cilium | default(true) | bool
 
