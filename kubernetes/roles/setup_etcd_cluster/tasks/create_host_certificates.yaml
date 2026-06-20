@@ -2,11 +2,10 @@
 - name: Create host certificates
   ansible.builtin.command:
     cmd: "{{ item }}"
-    creates: "/tmp/{{ current_host }}/pki/etcd/server.crt"
   loop:
     - "kubeadm init phase certs etcd-server --config=/tmp/{{ current_host }}/kubeadmcfg.yaml"
     - "kubeadm init phase certs etcd-peer --config=/tmp/{{ current_host }}/kubeadmcfg.yaml"
     - "kubeadm init phase certs etcd-healthcheck-client --config=/tmp/{{ current_host }}/kubeadmcfg.yaml"
     - "kubeadm init phase certs apiserver-etcd-client --config=/tmp/{{ current_host }}/kubeadmcfg.yaml"
     - "cp -R /etc/kubernetes/pki /tmp/{{ current_host }}/"
-    - find /etc/kubernetes/pki -not -name ca.crt -not -name ca.key -type f -delete
+    - "find /etc/kubernetes/pki -not -name ca.crt -not -name ca.key -type f -delete"
