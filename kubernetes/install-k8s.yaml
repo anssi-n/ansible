@@ -23,6 +23,9 @@
     - role: containerd
       when: install_containerd | default(true) | bool
     - role: kubeadm
+    - role: setup_ssh_keys_between_hosts
+      setup_ssh_keys_for_ansible_user: True
+      setup_ssh_keys_for_root: False
 
 - name: Setup external etcd cluster
   hosts: etcd_nodes

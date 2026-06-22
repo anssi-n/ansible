@@ -1,0 +1,58 @@
+---
+
+- name: Generate and fetch keys if setup is needed
+  block:
+
+  - ansible.builtin.set_fact:
+      other_hosts: "{{ ansible_play_hosts | reject('search', ansible_host) }}"
+
+  - name: Ensure ~/.ssh directory exists
+    become: false
+    ansible.builtin.file:
+      path: ~/.ssh/
+      state: directory
+
+  - name: Generate an OpenSSH keypair with the default values (4096 bits, rsa)
+    become: false
+    community.crypto.openssh_keypair:
+      path: ~/.ssh/id_rsa
+
+  - name: Fetch public key from host
+    become: false
+    ansible.builtin.fetch:
+      src: ~/.ssh/id_rsa.pub
+      dest: "/tmp/{{ ansible_host }}_id_rsa.pub"
+      flat: true
+
+  when: setup_ssh_keys_for_ansible_user or setup_ssh_keys_for_root
+
+- ansible.builtin.set_fact:
+    current_public_key: "/tmp/{{ ansible_host }}_id_rsa.pub"
+
+- name: Setup keys for ansible user between hosts
+  block:
+
+  - name: Set up authorized keys for ansible user to other nodes
+    become: false
+    ansible.posix.authorized_key:
+      user: "{{ hostvars[item]['ansible_user'] }}"
+      state: present
+      key: "{{ lookup('file', current_public_key) }}"
+    delegate_to: "{{ item }}"
+    loop: "{{ other_hosts | default([]) }}"
+
+  when: setup_ssh_keys_for_ansible_user
+
+- name: Setup keys for root user between hosts
+  block:
+
+  - name: Set up authorized keys for ansible user to other nodes
+    ansible.posix.authorized_key:
+      user: root
+      state: present
+      key: "{{ lookup('file', current_public_key) }}"
+    delegate_to: "{{ item }}"
+    loop: "{{ other_hosts | default([]) }}"
+
+  when: setup_ssh_keys_for_root
+
