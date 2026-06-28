@@ -73,10 +73,22 @@
   roles:
     - join_worker
 
+- name: Extra configuration for control plane nodes
+  hosts: control_plane_nodes
+  become: true
+  tags: [extra_control_plane]
+
+  vars_files:
+    - k8s_vars.yaml
+
+  roles:
+    - role: encrypt_etcd_at_rest
+      when: encrypt_etcd | default(false) | bool
+
 - name: Install extra software to cluster nodes
   hosts: k8s_cluster
   become: true
-  tags: [extra]
+  tags: [extra_sw]
 
   vars_files:
     - k8s_vars.yaml

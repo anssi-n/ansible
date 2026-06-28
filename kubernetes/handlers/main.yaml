@@ -1,0 +1,24 @@
+---
+- name: restart containerd
+  ansible.builtin.service:
+    name: "{{ containerd_service }}"
+    state: restarted
+
+- name: restart kubelet
+  ansible.builtin.service:
+    name: kubelet
+    state: restarted
+    daemon_reload: true
+
+- name: restart haproxy
+  ansible.builtin.service:
+    name: haproxy
+    state: restarted
+
+- name: ensure apiserver is running
+  ansible.builtin.command:
+    cmd: crictl ps --label io.kubernetes.container.name=kube-apiserver --output json
+  register: apiserver_status
+  until: apiserver_status.stdout | from_json | json_query('containers[0].state') == "CONTAINER_RUNNING"
+  retries: "{{ (apiserver_timeout | default(120))/5 | int }}"
+  delay: 5

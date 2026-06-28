@@ -1,0 +1,10 @@
+---
+apiserver_timeout: 60
+encrypted_resources:
+  - secrets
+encryption_providers:
+  - secretbox:
+      keys:
+        - name: key1
+          secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+  - identity: {}

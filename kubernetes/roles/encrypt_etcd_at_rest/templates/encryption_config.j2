@@ -1,0 +1,7 @@
+---
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources: {{ encrypted_resources  }}
+    providers:
+        {{ encryption_providers }}

@@ -6,8 +6,25 @@
     multiple_control_plane_nodes: "{{ groups['control_plane_nodes'] | length > 1 }}"
 
 - ansible.builtin.set_fact:
+    external_etcd: "{{ groups['etcd_nodes'] | length > 1 }}"
+
+- ansible.builtin.set_fact:
     control_plane_endpoint: "{{ hostvars[groups['lb_node'][0]]['ansible_host'] }}"
   when: multiple_control_plane_nodes
+
+- name: Copy cert files from external etcd node
+  block:
+
+  - name: Copy etcd certs to control plane node
+    ansible.builtin.copy:
+      src: "{{ etcd_cert_dir }}/{{ item }}"
+      dest: "/etc/kubernetes/pki/{{ item }}"
+    loop:
+      - etcd/ca.crt
+      - apiserver-etcd-client.crt
+      - apiserver-etcd-client.key
+
+  when: external_etcd
 
 # Create init config file from template
 - name: Create init config file

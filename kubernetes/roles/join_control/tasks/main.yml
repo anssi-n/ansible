@@ -5,6 +5,9 @@
   register: joined
 
 - ansible.builtin.set_fact:
+    external_etcd: "{{ groups['etcd_nodes'] | length > 1 }}"
+
+- ansible.builtin.set_fact:
     primary_control_plane_node: "{{ groups['control_plane_nodes'] | first | default('') }}"
 
 - block:

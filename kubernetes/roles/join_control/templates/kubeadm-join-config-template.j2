@@ -42,6 +42,7 @@ scheduler:
     - name: bind-address
       value: "0.0.0.0"
 
+{% if not external_etcd %}
 etcd:
   local:
     serverCertSANs:
@@ -57,3 +58,13 @@ etcd:
         value: "https://{{ ansible_host }}:2379"
       - name: initial-advertise-peer-urls
         value: "https://{{ ansible_host }}:2380"
+{% else %}
+etcd:
+  external:
+    endpoints: [{%- for host in groups['etcd_nodes'] -%}
+                         "https://{{ hostvars[host].ansible_host }}:2379"{% if not loop.last %},{% endif %}
+                       {%- endfor -%}]{{ ''}}
+    caFile: /etc/kubernetes/pki/etcd/ca.crt
+    certFile: /etc/kubernetes/pki/apiserver-etcd-client.crt
+    keyFile: /etc/kubernetes/pki/apiserver-etcd-client.key
+{% endif %}

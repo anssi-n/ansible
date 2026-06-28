@@ -1,0 +1,77 @@
+---
+- name: Check if encryption configuration is already present
+  ansible.builtin.lineinfile:
+    path: /etc/kubernetes/manifests/kube-apiserver.yaml
+    regex: '^\s+-\s+--encryption-provider-config.*$'
+    state: absent
+  changed_when: false
+  check_mode: true
+  register: encryption_config
+
+- name: Setup encrypting confidential data at rest
+  block:
+
+  - name: Ensure directory for encryption config exists
+    ansible.builtin.file:
+      path: "{{ encryption_config_dir | default('/etc/kubernetes/encryption') }}"
+      state: directory
+
+  - name: Create encryption configuration
+    ansible.builtin.template:
+      src:  encryption_config.j2
+      dest: "{{ encryption_config_dir | default('/etc/kubernetes/encryption') }}/encryption_config.yaml"
+
+  - name: Copy kube-apiserver.yaml to tmp for editing
+    ansible.builtin.copy:
+      src: /etc/kubernetes/manifests/kube-apiserver.yaml
+      dest: /tmp/kube-apiserver.yaml
+      remote_src: yes
+
+  - name: Add encryption configuration to apiserver parameters
+    ansible.builtin.blockinfile:
+      path: /tmp/kube-apiserver.yaml
+      insertafter: '^(\s+)-(\s+)kube-apiserver(.*)'
+      marker: "# {mark} ANSIBLE MANAGED APISERVER PARAMETER BLOCK -->"
+      block: |
+        {% filter indent(width=4, first=true) %}
+        - --encryption-provider-config={{ encryption_config_dir | default("/etc/kubernetes/encryption") }}/encryption_config.yaml
+        {% endfilter %}
+
+  - name: Add volume for encryption configuration
+    ansible.builtin.blockinfile:
+      path: /tmp/kube-apiserver.yaml
+      insertafter: '^(\s+)volumes:'
+      marker: "# {mark} ANSIBLE MANAGED VOLUME BLOCK -->"
+      block: |
+        {% filter indent(width=2, first=true) %}
+        - name: encryption-config
+          hostPath:
+            path: {{ encryption_config_dir | default("/etc/kubernetes/encryption") }}
+            type: DirectoryOrCreate
+        {% endfilter %}
+
+  - name: Add volume mount for encryption configuration
+    ansible.builtin.blockinfile:
+      path: /tmp/kube-apiserver.yaml
+      insertafter: '^(\s+)volumeMounts:'
+      marker: "# {mark} ANSIBLE MANAGED VOLUMEMOUNT BLOCK -->"
+      block: |
+        {% filter indent(width=4, first=true) %}
+        - name: encryption-config
+          mountPath: {{ encryption_config_dir | default("/etc/kubernetes/encryption") }}
+          readOnly: true
+        {% endfilter %}
+
+  - name: Copy edited kube-apiserver.yaml back to manifests directory
+    ansible.builtin.copy:
+      src: /tmp/kube-apiserver.yaml
+      dest: /etc/kubernetes/manifests/kube-apiserver.yaml
+      remote_src: yes
+
+  - name: Remove temp manifest file
+    ansible.builtin.file:
+      path: /tmp/kube-apiserver.yaml
+      state: absent
+    notify: ensure apiserver is running
+
+  when: encryption_config.found == 0

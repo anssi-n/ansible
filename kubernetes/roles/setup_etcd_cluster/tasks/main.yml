@@ -162,6 +162,13 @@
     delegate_to: localhost
     run_once: true
 
+  - name: Create permanent directory for etcd certs for primary control plane node
+    ansible.builtin.file:
+      path:  "{{ etcd_cert_dir }}"
+      state: directory
+    delegate_to: localhost
+    run_once: true
+
   - name: Copy certs and kubeadm configs for non-primary etcd nodes to localhost from primary etcd node
     become: false
     ansible.posix.synchronize:
@@ -170,6 +177,14 @@
       mode: pull
       private_key: "{{ ansible_ssh_private_key_file }}"
     loop: "{{ etcd_non_primary_hosts }}"
+    run_once: true
+
+  - name: Copy certs for control plane node to permamnent etcd certs dir
+    ansible.posix.synchronize:
+      src: /etc/kubernetes/pki/
+      dest: "{{ etcd_cert_dir }}"
+      mode: pull
+      private_key: "{{ ansible_ssh_private_key_file }}"
     run_once: true
 
   - name: Copy certs and kubeadm configs from localhost to non-primary etcd nodes
@@ -210,3 +225,27 @@
   run_once: true
 
 # 8. Optional: Check the cluster health.
+
+- ansible.builtin.set_fact:
+    etcd_cluster:
+      "{%- for host in groups['etcd_nodes'] -%}
+        https://{{ hostvars[host].ansible_host }}:2379{% if not loop.last %},{% endif %}
+      {%- endfor -%}"
+
+- name: Check etcd cluster status
+  ansible.builtin.command:
+    cmd: >
+      ETCDCTL_API=3 etcdctl
+      --cert /etc/kubernetes/pki/etcd/peer.crt
+      --key /etc/kubernetes/pki/etcd/peer.key
+      --cacert /etc/kubernetes/pki/etcd/ca.crt
+      --endpoints="{{ etcd_cluster }}" endpoint status --cluster -w table
+      "{{ etcd_cluster }}"
+  register: cluster_status
+
+- debug:
+    msg: "{{ cluster_status.stdout }}"
+
+- debug:
+    msg: "{{ cluster_status.stderr }}"
+    when: "{{ cluster_status.stderr }} != ''"
