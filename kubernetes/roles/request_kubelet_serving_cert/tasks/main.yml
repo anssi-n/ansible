@@ -18,18 +18,21 @@
 
 # Approve pending certificates
 
+- ansible.builtin.set_fact:
+    primary_control_plane_node: "{{ groups['control_plane_nodes'] | first | default('') }}"
+
 - name: Get CSR names
   ansible.builtin.shell:
     cmd: kubectl get csr --field-selector spec.signerName=kubernetes.io/kubelet-serving --no-headers | grep Pending | awk '{ print $1 }'
   register: pending_certs
-  delegate_to: localhost
+  delegate_to:  "{{ primary_control_plane_node }}"
   run_once: true
   when: config_result.changed
 
 - name: Approve CSRs
   ansible.builtin.command:
     cmd: "kubectl certificate approve {{ item }}"
-  delegate_to: localhost
+  delegate_to:  "{{ primary_control_plane_node }}"
   run_once: true
   loop: "{{ pending_certs.stdout_lines }}"
   when: config_result.changed

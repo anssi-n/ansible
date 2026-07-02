@@ -38,7 +38,7 @@
   roles:
     - setup_etcd_cluster
 
-- name: Initialize first control plane node and install cilium cni
+- name: Initialize first control plane node and install cni
   hosts: control_plane_nodes[0]
   become: true
   tags: [init_cluster]
@@ -85,10 +85,18 @@
     - role: encrypt_etcd_at_rest
       when: encrypt_etcd | default(false) | bool
 
-- name: Install extra software to cluster nodes
+- name: Extra configuration for worker nodes
+  hosts: worker_nodes
+  become: true
+  tags: [extra_worker]
+
+  vars_files:
+    - k8s_vars.yaml
+
+- name: Extra configuration for all cluster nodes
   hosts: k8s_cluster
   become: true
-  tags: [extra_sw]
+  tags: [extra_cluster]
 
   vars_files:
     - k8s_vars.yaml
@@ -96,3 +104,4 @@
   roles:
     - role: gvisor
       when: install_gvisor | default(false) | bool
+    - role: request_kubelet_serving_cert
