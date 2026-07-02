@@ -240,7 +240,6 @@
       --key /etc/kubernetes/pki/etcd/peer.key
       --cacert /etc/kubernetes/pki/etcd/ca.crt
       --endpoints="{{ etcd_cluster }}" endpoint status --cluster -w table
-      "{{ etcd_cluster }}"
   register: cluster_status
 
 - debug:

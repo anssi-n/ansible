@@ -1,0 +1,35 @@
+---
+- name: Get kubelet config file
+  ansible.builtin.shell:
+    cmd: ps -ef | grep '[k]ubelet' | grep -oP -- '--config=\K\S+'
+  register: kubelet_config
+  changed_when: kubelet_config.rc != 0
+
+- name: Add serverTLSBootstrap with value true to kubelet config
+  ansible.builtin.lineinfile:
+    state: present
+    dest: "{{ kubelet_config.stdout }}"
+    line: "serverTLSBootstrap: true"
+    regexp: '^serverTLSBootstrap: true'
+  notify: restart kubelet
+  register: config_result
+
+- ansible.builtin.meta: flush_handlers
+
+# Approve pending certificates
+
+- name: Get CSR names
+  ansible.builtin.shell:
+    cmd: kubectl get csr --field-selector spec.signerName=kubernetes.io/kubelet-serving --no-headers | grep Pending | awk '{ print $1 }'
+  register: pending_certs
+  delegate_to: localhost
+  run_once: true
+  when: config_result.changed
+
+- name: Approve CSRs
+  ansible.builtin.command:
+    cmd: "kubectl certificate approve {{ item }}"
+  delegate_to: localhost
+  run_once: true
+  loop: "{{ pending_certs.stdout_lines }}"
+  when: config_result.changed
