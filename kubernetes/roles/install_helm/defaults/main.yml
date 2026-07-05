@@ -1,0 +1,3 @@
+---
+install_helm_latest_helm_url: https://get.helm.sh/helm4-latest-version
+install_helm_target_dir: /usr/local/bin

@@ -1,0 +1,57 @@
+---
+# Install Helm on:
+# - loadbalancer node if exists and lb_setup_install_kubectl is true
+# - primary control plane node
+
+- name: Check if helm is already installed
+  ansible.builtin.stat:
+    path: "{{ install_helm_target_dir }}/helm"
+  register: install_helm_status
+
+- name: Install helm
+  when: not install_helm_status.stat.exists
+  block:
+    - name: Get latest Helm version
+      ansible.builtin.uri:
+        url: "{{ install_helm_latest_helm_url }}"
+        return_content: true
+      register: install_helm_version_response
+
+    - name: Set helm version
+      ansible.builtin.set_fact:
+        install_helm_version: "{{ install_helm_version_response.content | trim }}"
+
+    - name: Download latest helm release
+      ansible.builtin.get_url:
+        url: "https://get.helm.sh/helm-{{ install_helm_version }}-linux-amd64.tar.gz"
+        dest: "/tmp/helm-{{ install_helm_version }}-linux-amd64.tar.gz"
+        owner: root
+        group: root
+        mode: "0755"
+        checksum: "sha256:https://get.helm.sh/helm-{{ install_helm_version }}-linux-amd64.tar.gz.sha256sum"
+
+    - name: Extract archive
+      ansible.builtin.unarchive:
+        src: "/tmp/helm-{{ install_helm_version }}-linux-amd64.tar.gz"
+        dest: /tmp
+        owner: root
+        group: root
+        mode: "0755"
+        remote_src: true
+
+    - name: Copy helm to target location
+      ansible.builtin.copy:
+        src: /tmp/linux-amd64/helm
+        dest: "{{ install_helm_target_dir }}/helm"
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Remove extracted directory and downloaded archive
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/linux-amd64/
+        - "/tmp/helm-{{ install_helm_version }}-linux-amd64.tar.gz"

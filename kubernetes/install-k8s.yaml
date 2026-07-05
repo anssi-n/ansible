@@ -9,6 +9,8 @@
 
   roles:
     - role: lb_setup
+    - role: install_helm
+      when: lb_setup_install_kubectl
 
 - name: Install containerd cri, kubeadm, kubelet and kubectl to all nodes in cluster
   hosts: k8s_cluster
@@ -49,6 +51,7 @@
     - role: init_cluster
     - role: cilium
       when: install_cilium | default(true) | bool
+    - role: install_helm
 
 - name: Join the rest of the control plane nodes to cluster
   hosts: control_plane_nodes[1:]

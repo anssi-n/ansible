@@ -34,7 +34,7 @@
 
 - name: Set control plane node IPs
   ansible.builtin.set_fact:
-    lb_setup_control_plane_ips: "{{ lb_setup_control_plane_ips | default([]) + [hostvars[item]['ansible_host'] ] }}"
+    lb_setup_control_plane_ips: "{{ lb_setup_control_plane_ips | default([]) + [hostvars[item]['ansible_host']] }}"
   loop: "{{ groups['control_plane_nodes'] }}"
 
 - name: Configure backend endpoints

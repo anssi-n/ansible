@@ -44,3 +44,7 @@ gvisor_runsc_dirs:
   - "/usr/bin"
 gvisor_url: "https://storage.googleapis.com/gvisor/releases/release/latest"
 gvisor_containerd_config: "/etc/containerd/config.toml"
+
+# extra software: helm variables
+install_helm_latest_helm_url: https://get.helm.sh/helm4-latest-version
+install_helm_target_dir: /usr/local/bin
