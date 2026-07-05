@@ -1,0 +1,3 @@
+---
+install_fluxcd_latest_fluxcd_url: https://api.github.com/repos/fluxcd/flux2/releases/latest
+install_fluxcd_target_dir: /usr/local/bin

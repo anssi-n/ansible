@@ -48,3 +48,13 @@ gvisor_containerd_config: "/etc/containerd/config.toml"
 # extra software: helm variables
 install_helm_latest_helm_url: https://get.helm.sh/helm4-latest-version
 install_helm_target_dir: /usr/local/bin
+
+# extra software: fluxcd variables
+install_fluxcd_latest_fluxcd_url: https://api.github.com/repos/fluxcd/flux2/releases/latest
+install_fluxcd_target_dir: /usr/local/bin
+
+# bootsrap cluster
+bootstrap_cluster_github_owner: anssi-n
+bootstrap_cluster_github_repository: homelab
+bootstrap_cluster_github_repository_path: clusters/ansible
+bootstrap_cluster_timeout: 180

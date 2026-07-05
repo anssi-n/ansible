@@ -1,0 +1,45 @@
+# Install FluxCD on:
+# - loadbalancer node if exists and lb_setup_install_kubectl is true
+# - primary control plane node
+
+---
+- name: Check if FluxCD is already installed
+  ansible.builtin.stat:
+    path: "{{ install_fluxcd_target_dir }}/flux"
+  register: install_fluxcd_status
+
+- name: Install FluxCD
+  when: not install_fluxcd_status.stat.exists
+  block:
+    - name: Get latest FluxCD version
+      ansible.builtin.uri:
+        url: "{{ install_fluxcd_latest_fluxcd_url }}"
+        return_content: true
+      register: install_fluxcd_version_response
+
+    - name: Set FluxCD version
+      ansible.builtin.set_fact:
+        install_fluxcd_version: "{{ (install_fluxcd_version_response.content | from_json)['tag_name'] | default('') | regex_replace('^v', '') }}"
+
+    - name: Download latest FluxCD release
+      ansible.builtin.get_url:
+        url: "https://github.com/fluxcd/flux2/releases/download/v{{ install_fluxcd_version }}/flux_{{ install_fluxcd_version }}_linux_amd64.tar.gz"
+        dest: "/tmp/flux_{{ install_fluxcd_version }}_linux_amd64.tar.gz"
+        owner: root
+        group: root
+        mode: "0755"
+        checksum: "sha256:https://github.com/fluxcd/flux2/releases/download/v{{ install_fluxcd_version }}/flux_{{ install_fluxcd_version }}_checksums.txt"
+
+    - name: Install FluxCD
+      ansible.builtin.unarchive:
+        src: "/tmp/flux_{{ install_fluxcd_version }}_linux_amd64.tar.gz"
+        dest: "{{ install_fluxcd_target_dir }}"
+        owner: root
+        group: root
+        mode: "0755"
+        remote_src: true
+
+    - name: Remove downloaded archive
+      ansible.builtin.file:
+        path: "/tmp/flux_{{ install_fluxcd_version }}_linux_amd64.tar.gz"
+        state: absent

@@ -2,9 +2,9 @@
 lb ansible_host=192.168.56.10
 
 [etcd_nodes]
-etcd-1 ansible_host=192.168.59.10
-etcd-2 ansible_host=192.168.59.11
-etcd-3 ansible_host=192.168.59.12
+#etcd-1 ansible_host=192.168.59.10
+#etcd-2 ansible_host=192.168.59.11
+#etcd-3 ansible_host=192.168.59.12
 
 [control_plane_nodes]
 control-plane-1 ansible_host=192.168.57.10
@@ -14,7 +14,7 @@ control-plane-3 ansible_host=192.168.57.12
 [worker_nodes]
 worker-1 ansible_host=192.168.58.10
 worker-2 ansible_host=192.168.58.11
-worker-3 ansible_host=192.168.58.12
+#worker-3 ansible_host=192.168.58.12
 
 [k8s_cluster:children]
 control_plane_nodes

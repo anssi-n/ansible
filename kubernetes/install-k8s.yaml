@@ -11,6 +11,8 @@
     - role: lb_setup
     - role: install_helm
       when: lb_setup_install_kubectl
+    - role: install_fluxcd
+      when: lb_setup_install_kubectl
 
 - name: Install containerd cri, kubeadm, kubelet and kubectl to all nodes in cluster
   hosts: k8s_cluster
@@ -52,6 +54,7 @@
     - role: cilium
       when: install_cilium | default(true) | bool
     - role: install_helm
+    - role: install_fluxcd
 
 - name: Join the rest of the control plane nodes to cluster
   hosts: control_plane_nodes[1:]
@@ -107,3 +110,15 @@
     - role: gvisor
       when: install_gvisor | default(false) | bool
     - role: request_kubelet_serving_cert
+
+- name: Boostrap cluster with FluxCD
+  hosts: control_plane_nodes[0]
+  become: true
+  tags: [bootstrap_cluster]
+
+  # Note! Boostrapping requires Github pat in variable boostrap_cluster_github_pat
+  vars_files:
+    - k8s_vars.yaml
+
+  roles:
+    - role: bootstrap_cluster
