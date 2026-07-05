@@ -2,6 +2,6 @@
 apiVersion: apiserver.config.k8s.io/v1
 kind: EncryptionConfiguration
 resources:
-  - resources: {{ encrypted_resources  }}
+  - resources: {{ encrypt_etcd_at_rest_encrypted_resources  }}
     providers:
-        {{ encryption_providers }}
+        {{ encrypt_etcd_at_rest_encryption_providers }}

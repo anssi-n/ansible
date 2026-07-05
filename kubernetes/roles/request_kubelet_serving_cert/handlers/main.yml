@@ -1,0 +1,26 @@
+- name: Get pending CSR names
+  ansible.builtin.command:
+    cmd:
+      "kubectl get csr --field-selector spec.signerName=kubernetes.io/kubelet-serving --no-headers \
+      -o custom-columns=NAME:.metadata.name"
+  register: request_kubelet_serving_cert_csr_output
+  delegate_to: "{{ request_kubelet_serving_cert_primary_control_plane_node }}"
+  run_once: true
+  changed_when: false
+  listen: "approve pending csr"
+
+# - name: Extract pending cert names
+#   ansible.builtin.set_fact:
+#     request_kubelet_serving_cert_pending_certs:
+#       "{{ request_kubelet_serving_cert_csr_output.stdout_lines | select('search', 'Pending')\
+#       | map('split', ' ') | map(attribute='0') | list }}"
+#   listen: "approve pending csr"
+
+- name: Approve CSRs
+  ansible.builtin.command:
+    cmd: "kubectl certificate approve {{ item }}"
+  delegate_to: "{{ request_kubelet_serving_cert_primary_control_plane_node }}"
+  run_once: true
+  changed_when: false
+  loop: "{{ request_kubelet_serving_cert_csr_output.stdout_lines }}"
+  listen: "approve pending csr"

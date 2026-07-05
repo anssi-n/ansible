@@ -2,52 +2,61 @@
 - name: Check if join command is already executed
   ansible.builtin.stat:
     path: /etc/kubernetes/pki
-  register: joined
+  register: join_control_joined
 
-- ansible.builtin.set_fact:
-    external_etcd: "{{ groups['etcd_nodes'] | length > 1 }}"
+- name: Set external etcd if applicable
+  ansible.builtin.set_fact:
+    join_control_external_etcd: "{{ groups['etcd_nodes'] | length > 1 }}"
 
-- ansible.builtin.set_fact:
-    primary_control_plane_node: "{{ groups['control_plane_nodes'] | first | default('') }}"
+- name: Set primary control plane node
+  ansible.builtin.set_fact:
+    join_control_primary_control_plane_node: "{{ groups['control_plane_nodes'] | first | default('') }}"
 
-- block:
+- name: Join control plane node to cluster
+  when: not ( joined.stat.isdir is defined and joined.stat.isdir ) and join_control_primary_control_plane_node != ""
+  block:
+    - name: Get join command from primary control plane node
+      ansible.builtin.command:
+        cmd: kubeadm token create --print-join-command
+      register: join_control_join_command_output
+      delegate_to: "{{ join_control_primary_control_plane_node }}"
+      changed_when: false
+      run_once: true
 
-  - name: Get join command from primary control plane node
-    ansible.builtin.command:
-      cmd: kubeadm token create --print-join-command
-    register: join_command_output
-    delegate_to:  "{{ primary_control_plane_node }}"
-    run_once: true
+    - name: Set join worker command
+      ansible.builtin.set_fact:
+        join_control_join_worker_command: "{{ join_control_join_command_output.stdout }}"
+      run_once: true
 
-  - ansible.builtin.set_fact:
-      join_worker_command: "{{ join_command_output.stdout }}"
-    run_once: true
+    - name: Generate new certificate key to join other control plane nodes
+      ansible.builtin.command:
+        cmd: kubeadm init phase upload-certs --upload-certs  --config /tmp/kubeadm-init-config.yaml
+      register: join_control_upload_certs_command_output
+      delegate_to: "{{ join_control_primary_control_plane_node }}"
+      changed_when: false
+      run_once: true
 
-  - name: Generate new certificate key to join other control plane nodes
-    ansible.builtin.command:
-      cmd: kubeadm init phase upload-certs --upload-certs  --config /tmp/kubeadm-init-config.yaml
-    register: upload_certs_command_output
-    delegate_to:  "{{ primary_control_plane_node }}"
-    run_once: true
+    - name: Set cert key
+      ansible.builtin.set_fact:
+        join_control_cert_key: "{{ join_control_upload_certs_command_output.stdout_lines[-1] | trim }}"
+      run_once: true
 
-  - ansible.builtin.set_fact:
-      cert_key: "{{ upload_certs_command_output.stdout_lines[-1] | trim }}"
-    run_once: true
+    - name: Set required values from join worker command
+      ansible.builtin.set_fact:
+        join_control_join_token: "{{ (join_control_join_worker_command | split)[4] | trim }}"
+        join_control_api_server_endpoint: "{{ (join_control_join_worker_command | split)[2] | trim }}"
+        join_control_ca_cert_hash: "{{ (join_control_join_worker_command | split)[6] | trim }}"
 
-  - ansible.builtin.set_fact:
-      join_token: "{{ (join_worker_command | split)[4] | trim }}"
-      api_server_endpoint: "{{ (join_worker_command | split)[2] | trim }}"
-      ca_cert_hash: "{{ (join_worker_command | split)[6] | trim }}"
+    - name: Create join config file
+      ansible.builtin.template:
+        src: kubeadm-join-config-template.j2
+        dest: /tmp/kubeadm-join-config.yaml
+        owner: root
+        group: root
+        mode: "0755"
 
-  - name: Create join config file
-    ansible.builtin.template:
-       src: kubeadm-join-config-template.j2
-       dest: /tmp/kubeadm-join-config.yaml
-
-  - name: Join control plane node
-    ansible.builtin.command:
-      cmd: kubeadm join --config /tmp/kubeadm-join-config.yaml
-      creates: /etc/kubernetes/pki
-    register: control_join
-
-  when: not ( joined.stat.isdir is defined and joined.stat.isdir ) and primary_control_plane_node != ""
+    - name: Join control plane node
+      ansible.builtin.command:
+        cmd: kubeadm join --config /tmp/kubeadm-join-config.yaml
+        creates: /etc/kubernetes/pki
+      register: join_control_output

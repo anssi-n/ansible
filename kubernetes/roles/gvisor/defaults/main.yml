@@ -1,7 +1,7 @@
-runsc_target_dir: /usr/local/bin
-runsc_dirs:
+gvisor_runsc_target_dir: /usr/local/bin
+gvisor_runsc_dirs:
   - /usr/local/bin
   - /usr/bin
 gvisor_url: https://storage.googleapis.com/gvisor/releases/release/latest
-containerd_config: /etc/containerd/config.toml
-containerd_service: containerd
+gvisor_containerd_config: /etc/containerd/config.toml
+gvisor_containerd_service: containerd

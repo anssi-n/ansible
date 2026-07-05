@@ -4,10 +4,10 @@ kind: JoinConfiguration
 
 discovery:
   bootstrapToken:
-    token: "{{ join_token }}"
-    apiServerEndpoint: "{{ api_server_endpoint }}"
+    token: "{{ join_worker_join_token }}"
+    apiServerEndpoint: "{{ join_worker_api_server_endpoint }}"
     caCertHashes:
-      - "{{ ca_cert_hash }}"
+      - "{{ join_worker_ca_cert_hash }}"
 
 nodeRegistration:
   kubeletExtraArgs:
@@ -15,11 +15,11 @@ nodeRegistration:
       value: {{ ansible_host }}
 
 networking:
-  podSubnet: "{{ pod_network_cidr }}"
-  serviceSubnet: "{{ service_network_cidr }}"
+  podSubnet: "{{ init_cluster_pod_network_cidr }}"
+  serviceSubnet: "{{ init_cluster_service_network_cidr }}"
 
 apiServer:
-  certSANs: {{ apiserver_cert_extra_sans | safe | replace('\'', '\"') }}
+  certSANs: {{ init_cluster_apiserver_cert_extra_sans | safe | replace('\'', '\"') }}
   extraArgs:
     - name: bind-address
       value: "0.0.0.0"

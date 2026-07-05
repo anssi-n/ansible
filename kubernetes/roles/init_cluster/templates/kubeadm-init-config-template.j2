@@ -11,7 +11,7 @@ nodeRegistration:
     - name: node-ip
       value: "{{ ansible_host }}"
 
-{% if skip_kube_proxy %}
+{% if init_cluster_skip_kube_proxy %}
 skipPhases:
   - addon/kube-proxy
 {% endif %}
@@ -19,16 +19,16 @@ skipPhases:
 apiVersion: kubeadm.k8s.io/v1beta4
 kind: ClusterConfiguration
 
-{% if control_plane_endpoint is defined %}
-controlPlaneEndpoint: "{{ control_plane_endpoint }}:6443"
+{% if init_cluster_control_plane_endpoint is defined %}
+controlPlaneEndpoint: "{{ init_cluster_control_plane_endpoint }}:6443"
 {% endif %}
 
 networking:
-  podSubnet: "{{ pod_network_cidr }}"
-  serviceSubnet: "{{ service_network_cidr }}"
+  podSubnet: "{{ init_cluster_pod_network_cidr }}"
+  serviceSubnet: "{{ init_cluster_service_network_cidr }}"
 
 apiServer:
-  certSANs: {{ apiserver_cert_extra_sans | safe | replace('\'', '\"') }}
+  certSANs: {{ init_cluster_apiserver_cert_extra_sans | safe | replace('\'', '\"') }}
   extraArgs:
     - name: bind-address
       value: "0.0.0.0"
@@ -43,7 +43,7 @@ scheduler:
     - name: bind-address
       value: "0.0.0.0"
 
-{% if not external_etcd %}
+{% if not init_cluster_external_etcd %}
 etcd:
   local:
     serverCertSANs:

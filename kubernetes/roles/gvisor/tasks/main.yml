@@ -1,51 +1,49 @@
 ---
 - name: Check if gvisor is already installed
-  stat:
+  ansible.builtin.stat:
     path: "{{ item }}/runsc"
-  with_items: "{{ runsc_dirs }}"
-  register: stat_result
+  with_items: "{{ gvisor_runsc_dirs }}"
+  register: gvisor_stat_result
 
-- ansible.builtin.set_fact:
-    gvisor_installed: "{{ stat_result.results | selectattr('stat.exists', 'equalto', true) | list | length > 0 }}"
+- name: Set gvisor installation status
+  ansible.builtin.set_fact:
+    gvisor_installed: "{{ gvisor_stat_result.results | selectattr('stat.exists', 'equalto', true) | list | length > 0 }}"
 
-- ansible.builtin.debug:
-    msg: "gvisor_installed {{ gvisor_installed }}"
-
-- block:
-
-  - name: Download runsc
-    ansible.builtin.get_url:
-      url: "{{ gvisor_url }}/{{ ansible_facts['architecture'] }}/runsc"
-      dest: "{{ runsc_target_dir }}/runsc"
-      checksum: "sha512:{{ gvisor_url }}/{{ ansible_facts['architecture'] }}/runsc.sha512"
-      mode: '0555'
-
-  - name: Download containerd-shim-runsc-v1
-    ansible.builtin.get_url:
-      url: "{{ gvisor_url }}/{{ ansible_facts['architecture'] }}/containerd-shim-runsc-v1"
-      dest: "{{ runsc_target_dir }}/containerd-shim-runsc-v1"
-      checksum: "sha512:{{ gvisor_url }}/{{ ansible_facts['architecture'] }}/containerd-shim-runsc-v1.sha512"
-      mode: '0555'
-
-  - name: Get content of containerd config file
-    ansible.builtin.slurp:
-      src: "{{ containerd_config }}"
-    register: containerd_config_content
-
-  - ansible.builtin.set_fact:
-      number_of_spaces: "{{ (containerd_config_content.content | b64decode) | regex_search(regex_pattern, '\\1') | first | default('') }}"
-    vars:
-      regex_pattern: '([ ]*)\[plugins\.''io\.containerd\.cri\.v1\.runtime''\.containerd\.runtimes\]'
-
-  - name: Add gvisor config to containerd congfiguration file
-    ansible.builtin.blockinfile:
-      path: "{{ containerd_config }}"
-      prepend_newline: true
-      marker: "# {mark} gvisor configuration block added by Ansible"
-      insertafter: '\[plugins\.''io\.containerd\.cri\.v1\.runtime''\.containerd\.runtimes\]'
-      block: |
-        {{ number_of_spaces }}  [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.gvisor]
-        {{ number_of_spaces }}    runtime_type = 'io.containerd.runsc.v1'
-    notify: restart containerd
-
+- name: Install gvisor
   when: not gvisor_installed
+  block:
+    - name: Download runsc
+      ansible.builtin.get_url:
+        url: "{{ gvisor_url }}/{{ ansible_facts['architecture'] }}/runsc"
+        dest: "{{ gvisor_runsc_target_dir }}/runsc"
+        checksum: "sha512:{{ gvisor_url }}/{{ ansible_facts['architecture'] }}/runsc.sha512"
+        mode: "0555"
+
+    - name: Download containerd-shim-runsc-v1
+      ansible.builtin.get_url:
+        url: "{{ gvisor_url }}/{{ ansible_facts['architecture'] }}/containerd-shim-runsc-v1"
+        dest: "{{ gvisor_runsc_target_dir }}/containerd-shim-runsc-v1"
+        checksum: "sha512:{{ gvisor_url }}/{{ ansible_facts['architecture'] }}/containerd-shim-runsc-v1.sha512"
+        mode: "0555"
+
+    - name: Get content of containerd config file
+      ansible.builtin.slurp:
+        src: "{{ gvisor_containerd_config }}"
+      register: gvisor_containerd_config_content
+
+    - name: Spaces for padding
+      ansible.builtin.set_fact:
+        gvisor_number_of_spaces: "{{ (gvisor_containerd_config_content.content | b64decode) | regex_search(regex_pattern, '\\1') | first | default('') }}"
+      vars:
+        regex_pattern: '([ ]*)\[plugins\.''io\.containerd\.cri\.v1\.runtime''\.containerd\.runtimes\]'
+
+    - name: Add gvisor config to containerd congfiguration file
+      ansible.builtin.blockinfile:
+        path: "{{ gvisor_containerd_config }}"
+        prepend_newline: true
+        marker: "# {mark} gvisor configuration block added by Ansible"
+        insertafter: '\[plugins\.''io\.containerd\.cri\.v1\.runtime''\.containerd\.runtimes\]'
+        block: |
+          {{ gvisor_number_of_spaces }}  [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.gvisor]
+          {{ gvisor_number_of_spaces }}    runtime_type = 'io.containerd.runsc.v1'
+      notify: restart containerd

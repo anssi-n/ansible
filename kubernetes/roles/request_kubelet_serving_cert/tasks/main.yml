@@ -1,38 +1,38 @@
 ---
+# - name: Get kubelet config file
+#   ansible.builtin.shell:
+#     cmd: set -o pipefail && ps -ef | grep '[k]ubelet' | grep -oP -- '--config=\K\S+'
+#   register: request_kubelet_serving_cert_kubelet_config
+#   changed_when: kubelet_config.rc != 0
+
+- name: Get primary control plane node
+  ansible.builtin.set_fact:
+    request_kubelet_serving_cert_primary_control_plane_node: "{{ groups['control_plane_nodes'] | first | default('') }}"
+
 - name: Get kubelet config file
-  ansible.builtin.shell:
-    cmd: ps -ef | grep '[k]ubelet' | grep -oP -- '--config=\K\S+'
-  register: kubelet_config
-  changed_when: kubelet_config.rc != 0
+  ansible.builtin.command:
+    cmd: ps -ef
+  register: request_kubelet_serving_cert_ps_output
+  changed_when: false
+
+- name: Extract kubelet config path
+  ansible.builtin.set_fact:
+    request_kubelet_serving_cert_kubelet_config_path: >-
+      {{ (request_kubelet_serving_cert_ps_output.stdout
+          | regex_findall('kubelet.*--config=([^\s]+)'))
+          | first
+          | default('') }}
 
 - name: Add serverTLSBootstrap with value true to kubelet config
   ansible.builtin.lineinfile:
     state: present
-    dest: "{{ kubelet_config.stdout }}"
+    dest: "{{ request_kubelet_serving_cert_kubelet_config_path }}"
     line: "serverTLSBootstrap: true"
-    regexp: '^serverTLSBootstrap: true'
-  notify: restart kubelet
-  register: config_result
+    regexp: "^serverTLSBootstrap: true"
+  notify:
+    - restart kubelet
+    - approve pending csr
+  register: request_kubelet_serving_cert_config_result
 
-- ansible.builtin.meta: flush_handlers
-
-# Approve pending certificates
-
-- ansible.builtin.set_fact:
-    primary_control_plane_node: "{{ groups['control_plane_nodes'] | first | default('') }}"
-
-- name: Get CSR names
-  ansible.builtin.shell:
-    cmd: kubectl get csr --field-selector spec.signerName=kubernetes.io/kubelet-serving --no-headers | grep Pending | awk '{ print $1 }'
-  register: pending_certs
-  delegate_to:  "{{ primary_control_plane_node }}"
-  run_once: true
-  when: config_result.changed
-
-- name: Approve CSRs
-  ansible.builtin.command:
-    cmd: "kubectl certificate approve {{ item }}"
-  delegate_to:  "{{ primary_control_plane_node }}"
-  run_once: true
-  loop: "{{ pending_certs.stdout_lines }}"
-  when: config_result.changed
+- name: Ensure kubelet is restarted immediately
+  ansible.builtin.meta: flush_handlers

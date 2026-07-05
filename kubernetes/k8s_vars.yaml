@@ -1,34 +1,35 @@
 # containerd variables
 install_containerd: true
-cni_plugins_version: "v1.9.1"
-cni_plugins_target_dir: "/opt/cni/bin"
+containerd_cni_plugins_version: "v1.9.1"
+containerd_crictl_version: "v1.36.0"
+containerd_cni_plugins_target_dir: "/opt/cni/bin"
 containerd_sandbox_image: "registry.k8s.io/pause:3.10.1"
 containerd_service: "containerd"
 
 # kubernetes variables
-kubernetes_version: "v1.36"
-pod_network_cidr: "10.100.0.0/16"
-service_network_cidr: "10.44.0.0/16"
-apiserver_cert_extra_sans: []
-skip_kube_proxy: true
+kubeadm_kubernetes_version: "v1.36"
+init_cluster_pod_network_cidr: "10.100.0.0/16"
+init_cluster_service_network_cidr: "10.44.0.0/16"
+init_cluster_apiserver_cert_extra_sans: []
+init_cluster_skip_kube_proxy: true
 
 # cilium cni variables
 install_cilium: true
 cilium_cli_target_dir: "/usr/local/bin"
 
 # loadbalancer variables
-install_kubectl: true # install kubectl on loadbalancer
-setup_kubeconfig_on_lb: true # set .kube/config on loadbalancer
+lb_setup_install_kubectl: true # install kubectl on loadbalancer
+init_cluster_setup_kubeconfig_on_lb: true # set .kube/config on loadbalancer
 
 # etcd variables
 etcd_cert_dir: "/tmp/etcd_cert"
 
 # encrypt etcd at rest
-encrypt_etcd: false
-apiserver_timeout: 60
-encrypted_resources:
+encrypt_etcd_at_rest_encrypt_etcd: true
+encrypt_etcd_at_rest_apiserver_timeout: 60
+encrypt_etcd_at_rest_encrypted_resources:
   - secrets
-encryption_providers:
+encrypt_etcd_at_rest_encryption_providers:
   - secretbox:
       keys:
         - name: key1
@@ -37,9 +38,9 @@ encryption_providers:
 
 # extra software: gvisor variables
 install_gvisor: true
-runsc_target_dir: "/usr/local/bin"
-runsc_dirs:
+gvisor_runsc_target_dir: "/usr/local/bin"
+gvisor_runsc_dirs:
   - "/usr/local/bin"
   - "/usr/bin"
 gvisor_url: "https://storage.googleapis.com/gvisor/releases/release/latest"
-containerd_config: "/etc/containerd/config.toml"
+gvisor_containerd_config: "/etc/containerd/config.toml"

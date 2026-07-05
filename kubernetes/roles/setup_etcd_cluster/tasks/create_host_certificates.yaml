@@ -2,6 +2,7 @@
 - name: Create host certificates
   ansible.builtin.command:
     cmd: "{{ item }}"
+  changed_when: false
   loop:
     - "kubeadm init phase certs etcd-server --config=/tmp/{{ current_host }}/kubeadmcfg.yaml"
     - "kubeadm init phase certs etcd-peer --config=/tmp/{{ current_host }}/kubeadmcfg.yaml"

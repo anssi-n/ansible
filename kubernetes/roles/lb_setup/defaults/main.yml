@@ -1,3 +1,1 @@
 ---
-install_kubectl: true
-kubernetes_version: "v1.36"

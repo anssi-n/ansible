@@ -4,7 +4,27 @@
     name: haproxy
     state: present
     update_cache: true
+    force_apt_get: true
     cache_valid_time: 3600
+
+# - name: Ensure software-properties-common is installed
+#   ansible.builtin.apt:
+#     name: software-properties-common
+#     state: present
+#     update_cache: true
+
+# - name: Add HAProxy official PPA repository
+#   ansible.builtin.apt_repository:
+#     repo: ppa:vbernat/haproxy-2.8
+#     state: present
+#     update_cache: true
+
+# - name: Install HAProxy and Socat
+#   ansible.builtin.apt:
+#     name:
+#       - haproxy
+#       - socat
+#     state: present
 
 - name: Enable and start HAProxy
   ansible.builtin.service:
@@ -14,13 +34,13 @@
 
 - name: Set control plane node IPs
   ansible.builtin.set_fact:
-    control_plane_ips: "{{ control_plane_ips | default([]) + [ hostvars[item]['ansible_host'] ] }}"
+    lb_setup_control_plane_ips: "{{ lb_setup_control_plane_ips | default([]) + [hostvars[item]['ansible_host'] ] }}"
   loop: "{{ groups['control_plane_nodes'] }}"
 
 - name: Configure backend endpoints
   ansible.builtin.set_fact:
-    haproxy_backend_servers: |
-      {% for ip in control_plane_ips %}
+    lb_setup_haproxy_backend_servers: |
+      {% for ip in lb_setup_control_plane_ips %}
              server control-{{ loop.index }} {{ ip }}:6443 check
       {% endfor %}
 
@@ -43,47 +63,44 @@
          balance roundrobin
          default-server inter 10s downinter 5s rise 2 fall 2 slowstart 60s maxconn 250 maxqueue 256 weight 100
 
-      {{ haproxy_backend_servers }}
+      {{ lb_setup_haproxy_backend_servers }}
   notify: restart haproxy
 
 # Install kubectl
 
-- debug:
-    var: install_kubectl
+- name: Install kubectl
+  when: lb_setup_install_kubectl
+  block:
+    - name: Install dependencies for adding repository
+      ansible.builtin.package:
+        name:
+          - ca-certificates
+          - curl
+          - apt-transport-https
+          - gpg
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
 
-- block:
-  - name: Install dependencies for adding repository
-    ansible.builtin.package:
-      name:
-        - ca-certificates
-        - curl
-        - apt-transport-https
-        - gpg
-      state: present
-      update_cache: yes
-      cache_valid_time: 3600
+    - name: Ensure keyrings directory exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
 
-  - name: Ensure keyrings directory exists
-    ansible.builtin.file:
-      path: /etc/apt/keyrings
-      state: directory
-      mode: '0755'
+    - name: Add Kubernetes official repository
+      ansible.builtin.deb822_repository:
+        name: kubernetes
+        types: [deb]
+        uris: "https://pkgs.k8s.io/core:/stable:/{{ kubeadm_kubernetes_version }}/deb/"
+        suites: /
+        signed_by: "https://pkgs.k8s.io/core:/stable:/{{ kubeadm_kubernetes_version }}/deb/Release.key"
+        state: present
 
-  - name: Add Kubernetes official repository
-    ansible.builtin.deb822_repository:
-      name: kubernetes
-      types: [deb]
-      uris: "https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/deb/"
-      suites: /
-      signed_by: "https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/deb/Release.key"
-      state: present
-
-  - name: Install kubectl
-    ansible.builtin.apt:
-      name:
-        - kubectl
-      state: present
-      update_cache: yes
-    register: pkg_install
-
-  when: install_kubectl
+    - name: Install kubectl
+      ansible.builtin.apt:
+        name:
+          - kubectl
+        state: present
+        update_cache: true
+      register: lb_setup_pkg_install

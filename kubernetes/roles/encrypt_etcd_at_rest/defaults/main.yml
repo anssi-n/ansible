@@ -1,8 +1,8 @@
 ---
-apiserver_timeout: 60
-encrypted_resources:
+encrypt_etcd_at_rest_apiserver_timeout: 60
+encrypt_etcd_at_rest_encrypted_resources:
   - secrets
-encryption_providers:
+encrypt_etcd_at_rest_encryption_providers:
   - secretbox:
       keys:
         - name: key1

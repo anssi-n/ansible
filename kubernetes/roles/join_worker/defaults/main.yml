@@ -1,4 +1,1 @@
 ---
-pod_network_cidr: "10.100.0.0/16"
-service_network_cidr: "10.44.0.0/16"
-apiserver_cert_extra_sans: []

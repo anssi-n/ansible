@@ -9,7 +9,6 @@
 
   roles:
     - role: lb_setup
-      install_kubectl: true
 
 - name: Install containerd cri, kubeadm, kubelet and kubectl to all nodes in cluster
   hosts: k8s_cluster
@@ -24,8 +23,8 @@
       when: install_containerd | default(true) | bool
     - role: kubeadm
     - role: setup_ssh_keys_between_hosts
-      setup_ssh_keys_for_ansible_user: True
-      setup_ssh_keys_for_root: False
+      setup_ssh_keys_between_hosts_for_ansible_user: true
+      setup_ssh_keys_between_hosts_for_root: false
 
 - name: Setup external etcd cluster
   hosts: etcd_nodes
@@ -83,7 +82,7 @@
 
   roles:
     - role: encrypt_etcd_at_rest
-      when: encrypt_etcd | default(false) | bool
+      when: encrypt_etcd_at_rest_encrypt_etcd | default(false) | bool
 
 - name: Extra configuration for worker nodes
   hosts: worker_nodes

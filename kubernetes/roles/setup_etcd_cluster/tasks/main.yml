@@ -7,24 +7,30 @@
   ansible.builtin.file:
     path: /etc/systemd/system/kubelet.service.d
     state: directory
+    owner: root
+    group: root
+    mode: "0775"
 
 - name: Copy KubeletConfiguration and service manager configuration files to etcd host
   ansible.builtin.copy:
     src: "{{ item }}"
     dest: "/etc/systemd/system/kubelet.service.d/{{ item }}"
+    owner: root
+    group: root
+    mode: "0775"
   loop:
     - kubelet.conf
     - 20-etcd-service-manager.conf
   notify: restart kubelet
 
 - name: Run pending handlers
-  meta: flush_handlers
+  ansible.builtin.meta: flush_handlers
 
 - name: Ensure kubelet is running
   ansible.builtin.service:
     name: kubelet
     state: started
-    enabled: yes
+    enabled: true
 
 - name: Install crictl for troubleshooting purposes
   ansible.builtin.apt:
@@ -34,48 +40,59 @@
 # Install etcdctl
 
 - name: Check if etcdctl is already been installed
-  stat:
+  ansible.builtin.stat:
     path: /usr/local/bin/etcdctl
-  register: etcdctl
+  register: setup_etcd_cluster_etcdctl
 
-- block:
+- name: Install etcdctl
+  when: not setup_etcd_cluster_etcdctl.stat.exists
+  block:
+    - name: Get latest etcd release info
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/etcd-io/etcd/releases/latest
+        return_content: true
+      register: setup_etcd_cluster_etcd_release
 
-  - name: Get latest version of etcd
-    ansible.builtin.shell:
-      cmd: curl -s https://api.github.com/repos/etcd-io/etcd/releases/latest | grep tag_name | cut -d '"' -f 4
-    register: etcd_version
+    - name: Set etcd version fact
+      ansible.builtin.set_fact:
+        setup_etcd_cluster_etcd_version: "{{ setup_etcd_cluster_etcd_release.json.tag_name }}" # remove 'v' if needed
 
-  - name: Download latest version etcd
-    ansible.builtin.get_url:
-      url: "https://github.com/etcd-io/etcd/releases/download/{{ etcd_version.stdout | trim }}/etcd-{{ etcd_version.stdout | trim }}-linux-amd64.tar.gz"
-      dest: "/tmp/etcd-{{ etcd_version.stdout | trim }}-linux-amd64.tar.gz"
+    - name: Download latest version etcd
+      ansible.builtin.get_url:
+        url:
+          "https://github.com/etcd-io/etcd/releases/download/{{ setup_etcd_cluster_etcd_version }}\
+          /etcd-{{ setup_etcd_cluster_etcd_version }}-linux-amd64.tar.gz"
+        dest: "/tmp/etcd-{{ setup_etcd_cluster_etcd_version }}-linux-amd64.tar.gz"
+        owner: root
+        group: root
+        mode: "0775"
 
-  - name: Open archive
-    ansible.builtin.unarchive:
-      src: "/tmp/etcd-{{ etcd_version.stdout | trim }}-linux-amd64.tar.gz"
-      dest: "/tmp"
-      remote_src: true
+    - name: Open archive
+      ansible.builtin.unarchive:
+        src: "/tmp/etcd-{{ setup_etcd_cluster_etcd_version }}-linux-amd64.tar.gz"
+        dest: "/tmp"
+        remote_src: true
 
-  - name: Copy etcdctl binary to /usr/local/bin directory
-    ansible.builtin.copy:
-      src: "/tmp/etcd-{{ etcd_version.stdout | trim }}-linux-amd64/etcdctl"
-      dest: /usr/local/bin/etcdctl
-      mode: "0755"
-      remote_src: yes
-
-  when: not etcdctl.stat.exists
+    - name: Copy etcdctl binary to /usr/local/bin directory
+      ansible.builtin.copy:
+        src: "/tmp/etcd-{{ setup_etcd_cluster_etcd_version }}-linux-amd64/etcdctl"
+        dest: /usr/local/bin/etcdctl
+        mode: "0755"
+        remote_src: true
 
 # 2. Create configuration files for kubeadm. Do this only on the first node.
 
-- ansible.builtin.set_fact:
-    etcd_names: "{{ groups['etcd_nodes'] }}"
-    etcd_hosts: "{{ groups['etcd_nodes'] | map('extract', hostvars, 'ansible_host') | list }}"
-    etcd_non_primary_names: "{{ groups['etcd_nodes'] | reject('search', inventory_hostname)}}"
-    etcd_non_primary_hosts: "{{ groups['etcd_nodes'] | map('extract', hostvars, 'ansible_host') | list | reject('search', ansible_host)}}"
+- name: Set required facts for etcd names and hosts
+  ansible.builtin.set_fact:
+    setup_etcd_cluster_etcd_names: "{{ groups['etcd_nodes'] }}"
+    setup_etcd_cluster_etcd_hosts: "{{ groups['etcd_nodes'] | map('extract', hostvars, 'ansible_host') | list }}"
+    setup_etcd_cluster_etcd_non_primary_names: "{{ groups['etcd_nodes'] | reject('search', inventory_hostname) }}"
+    setup_etcd_cluster_etcd_non_primary_hosts: "{{ groups['etcd_nodes'] | map('extract', hostvars, 'ansible_host') | list | reject('search', ansible_host) }}"
   run_once: true
 
-- ansible.builtin.set_fact:
-    names_to_hosts: "{{ names_to_hosts | default({}) | combine( {item: hostvars[item]['ansible_host']} ) }}"
+- name: Define names to hosts mapping
+  ansible.builtin.set_fact:
+    setup_etcd_cluster_names_to_hosts: "{{ setup_etcd_cluster_names_to_hosts | default({}) | combine({item: hostvars[item]['ansible_host']}) }}"
   with_items:
     - "{{ groups['etcd_nodes'] }}"
   run_once: true
@@ -84,18 +101,21 @@
   ansible.builtin.file:
     path: "/tmp/{{ item }}"
     state: directory
-    owner: vagrant
-    group: vagrant
-    mode: '0775'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0775"
     recurse: true
-  loop: "{{ etcd_hosts }}"
+  loop: "{{ setup_etcd_cluster_etcd_hosts }}"
   run_once: true
 
 - name: Create kubeadm configuration files for each etcd cluster node
   ansible.builtin.template:
     src: kubeadm_config.j2
     dest: "/tmp/{{ item }}/kubeadmcfg.yaml"
-  loop: "{{ etcd_hosts }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0775"
+  loop: "{{ setup_etcd_cluster_etcd_hosts }}"
   loop_control:
     index_var: idx
   run_once: true
@@ -109,116 +129,132 @@
   run_once: true
 
 - name: Check if certficates have already been generated
-  stat:
+  ansible.builtin.stat:
     path: /etc/kubernetes/pki/etcd/server.crt
-  register: server_cert
+  register: setup_etcd_cluster_server_cert
 
-- block:
+- name: Create certificates for each member node
+  when: not setup_etcd_cluster_server_cert.stat.exists
+  block:
+    # 4. Create certificates for each member. Do this only on the first node.
 
-  # 4. Create certificates for each member. Do this only on the first node.
+    - name: Create certificates for other nodes
+      ansible.builtin.include_tasks: create_host_certificates.yaml
+      loop: "{{ setup_etcd_cluster_etcd_non_primary_hosts }}"
+      loop_control:
+        loop_var: current_host
+      run_once: true
 
-  - name: Create certificates for other nodes
-    ansible.builtin.include_tasks: create_host_certificates.yaml
-    loop: "{{ etcd_non_primary_hosts }}"
-    loop_control:
-      loop_var: current_host
-    run_once: true
+    - name: Create certificates for primary node
+      ansible.builtin.command:
+        cmd: "{{ item }}"
+      changed_when: false
+      loop:
+        - "kubeadm init phase certs etcd-server --config=/tmp/{{ ansible_host }}/kubeadmcfg.yaml"
+        - "kubeadm init phase certs etcd-peer --config=/tmp/{{ ansible_host }}/kubeadmcfg.yaml"
+        - "kubeadm init phase certs etcd-healthcheck-client --config=/tmp/{{ ansible_host }}/kubeadmcfg.yaml"
+        - "kubeadm init phase certs apiserver-etcd-client --config=/tmp/{{ ansible_host }}/kubeadmcfg.yaml"
+      run_once: true
 
-  - name: Create certificates for primary node
-    ansible.builtin.command:
-      cmd: "{{ item }}"
-    loop:
-      - "kubeadm init phase certs etcd-server --config=/tmp/{{ ansible_host }}/kubeadmcfg.yaml"
-      - "kubeadm init phase certs etcd-peer --config=/tmp/{{ ansible_host }}/kubeadmcfg.yaml"
-      - "kubeadm init phase certs etcd-healthcheck-client --config=/tmp/{{ ansible_host }}/kubeadmcfg.yaml"
-      - "kubeadm init phase certs apiserver-etcd-client --config=/tmp/{{ ansible_host }}/kubeadmcfg.yaml"
-    run_once: true
+    - name: Clean up certs that should not be copied off this host
+      ansible.builtin.command:
+        cmd: "find /tmp/{{ item }} -name ca.key -type f -delete"
+        removes: "/tmp/{{ item }}/pki/etcd/ca.key"
+      loop: "{{ setup_etcd_cluster_etcd_non_primary_hosts }}"
+      run_once: true
 
-  - name: Clean up certs that should not be copied off this host
-    ansible.builtin.command:
-      cmd: "find /tmp/{{ item }} -name ca.key -type f -delete"
-      removes: "/tmp/{{ item }}/pki/etcd/ca.key"
-    loop: "{{ etcd_non_primary_hosts }}"
-    run_once: true
+    - name: Change permissions on temp directories/remote/file/path to ansible:user so we can write to it
+      ansible.builtin.file:
+        path: "/tmp/{{ item }}/"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0775"
+        recurse: true
+      loop: "{{ setup_etcd_cluster_etcd_hosts }}"
+      run_once: true
 
-  - name: Change permissions on temp directories/remote/file/path to ansible:user so we can write to it
-    ansible.builtin.file:
-      path: "/tmp/{{ item }}/"
-      owner: vagrant
-      group: vagrant
-      mode: '0775'
-      recurse: true
-    loop: "{{ etcd_hosts }}"
-    run_once: true
+    # 5. Copy certificates and kubeadm configs. Do this only on the first node.
 
-  # 5. Copy certificates and kubeadm configs. Do this only on the first node.
+    - name: Get the user running the playbook
+      ansible.builtin.set_fact:
+        setup_etcd_cluster_playbook_user: "{{ lookup('env', 'USER') }}"
 
-  - name: Create temporary directories on localhost for each non-primary etcd node
-    become: false
-    ansible.builtin.file:
-      path: "/tmp/{{ item }}"
-      state: directory
-    loop: "{{ etcd_non_primary_hosts }}"
-    delegate_to: localhost
-    run_once: true
+    - name: Create temporary directories on localhost for each non-primary etcd node
+      become: false
+      ansible.builtin.file:
+        path: "/tmp/{{ item }}"
+        state: directory
+        owner: "{{ setup_etcd_cluster_playbook_user }}"
+        group: "{{ setup_etcd_cluster_playbook_user }}"
+        mode: "0775"
+      loop: "{{ setup_etcd_cluster_etcd_non_primary_hosts }}"
+      delegate_to: localhost
+      run_once: true
 
-  - name: Create permanent directory for etcd certs for primary control plane node
-    ansible.builtin.file:
-      path:  "{{ etcd_cert_dir }}"
-      state: directory
-    delegate_to: localhost
-    run_once: true
+    - name: Create permanent directory for etcd certs for primary control plane node
+      ansible.builtin.file:
+        path: "{{ etcd_cert_dir }}"
+        state: directory
+        owner: "{{ setup_etcd_cluster_playbook_user }}"
+        group: "{{ setup_etcd_cluster_playbook_user }}"
+        mode: "0775"
+      delegate_to: localhost
+      run_once: true
 
-  - name: Copy certs and kubeadm configs for non-primary etcd nodes to localhost from primary etcd node
-    become: false
-    ansible.posix.synchronize:
-      src: "/tmp/{{ item }}/"
-      dest: "/tmp/{{ item }}/"
-      mode: pull
-      private_key: "{{ ansible_ssh_private_key_file }}"
-    loop: "{{ etcd_non_primary_hosts }}"
-    run_once: true
+    - name: Copy certs and kubeadm configs for non-primary etcd nodes to localhost from primary etcd node
+      become: false
+      ansible.posix.synchronize:
+        src: "/tmp/{{ item }}/"
+        dest: "/tmp/{{ item }}/"
+        mode: pull
+        private_key: "{{ ansible_ssh_private_key_file }}"
+      loop: "{{ setup_etcd_cluster_etcd_non_primary_hosts }}"
+      run_once: true
 
-  - name: Copy certs for control plane node to permamnent etcd certs dir
-    ansible.posix.synchronize:
-      src: /etc/kubernetes/pki/
-      dest: "{{ etcd_cert_dir }}"
-      mode: pull
-      private_key: "{{ ansible_ssh_private_key_file }}"
-    run_once: true
+    - name: Copy certs for control plane node to permanent etcd certs dir
+      ansible.posix.synchronize:
+        src: /etc/kubernetes/pki/
+        dest: "{{ etcd_cert_dir }}"
+        mode: pull
+        private_key: "{{ ansible_ssh_private_key_file }}"
+      run_once: true
 
-  - name: Copy certs and kubeadm configs from localhost to non-primary etcd nodes
-    ansible.builtin.copy:
-      src: "/tmp/{{ names_to_hosts[item] }}/"
-      dest: "/tmp/{{ names_to_hosts[item] }}/"
-    delegate_to: "{{ item }}"
-    loop: "{{ etcd_non_primary_names }}"
-    run_once: true
+    - name: Copy certs and kubeadm configs from localhost to non-primary etcd nodes
+      ansible.builtin.copy:
+        src: "/tmp/{{ setup_etcd_cluster_names_to_hosts[item] }}/"
+        dest: "/tmp/{{ setup_etcd_cluster_names_to_hosts[item] }}/"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0775"
+      delegate_to: "{{ item }}"
+      loop: "{{ setup_etcd_cluster_etcd_non_primary_names }}"
+      run_once: true
 
-  - name: Copy certs from /tmp/ to /etc/kubernetes directory in non-primary etcd nodes
-    ansible.builtin.copy:
-      src: "/tmp/{{ names_to_hosts[item] }}/pki"
-      dest: "/etc/kubernetes/"
-    delegate_to: "{{ item }}"
-    loop: "{{ etcd_non_primary_names }}"
-    run_once: true
+    - name: Copy certs from /tmp/ to /etc/kubernetes directory in non-primary etcd nodes
+      ansible.builtin.copy:
+        src: "/tmp/{{ setup_etcd_cluster_names_to_hosts[item] }}/pki"
+        dest: "/etc/kubernetes/"
+        owner: root
+        group: root
+        mode: "0775"
+      delegate_to: "{{ item }}"
+      loop: "{{ setup_etcd_cluster_etcd_non_primary_names }}"
+      run_once: true
 
-  - name: Delete certs and kubeadm configs directories from localhost /tmp
-    ansible.builtin.file:
-      path: "/tmp/{{ item }}"
-      state: absent
-    loop: "{{ etcd_non_primary_hosts }}"
-    delegate_to: localhost
-    run_once: true
-
-  when: not server_cert.stat.exists
+    - name: Delete certs and kubeadm configs directories from localhost /tmp
+      ansible.builtin.file:
+        path: "/tmp/{{ item }}"
+        state: absent
+      loop: "{{ setup_etcd_cluster_etcd_non_primary_hosts }}"
+      delegate_to: localhost
+      run_once: true
 
 # 6. Ensure all expected files exist.
 # 7. Create the static pod manifests.
 
 - name: Create the static pod manifests in all etcd cluster nodes
   ansible.builtin.command:
-    cmd: "kubeadm init phase etcd local --config=/tmp/{{ names_to_hosts[item] }}/kubeadmcfg.yaml"
+    cmd: "kubeadm init phase etcd local --config=/tmp/{{ setup_etcd_cluster_names_to_hosts[item] }}/kubeadmcfg.yaml"
     creates: /etc/kubernetes/manifests/etcd.yaml
   delegate_to: "{{ item }}"
   loop: "{{ groups['etcd_nodes'] }}"
@@ -226,25 +262,31 @@
 
 # 8. Optional: Check the cluster health.
 
-- ansible.builtin.set_fact:
-    etcd_cluster:
-      "{%- for host in groups['etcd_nodes'] -%}
-        https://{{ hostvars[host].ansible_host }}:2379{% if not loop.last %},{% endif %}
-      {%- endfor -%}"
+- name: Create string of all etcd cluster nodes for etcdctl endpoints parameter value
+  ansible.builtin.set_fact:
+    setup_etcd_cluster_etcd_cluster: >-
+      "{%- for host in groups['etcd_nodes'] -%}https://{{ hostvars[host].ansible_host }}:2379{% if not loop.last %},{% endif %}{%- endfor -%}"
+
+- name: Wait for the etcd cluster to start
+  ansible.builtin.pause:
+    minutes: 1
 
 - name: Check etcd cluster status
   ansible.builtin.command:
     cmd: >
-      ETCDCTL_API=3 etcdctl
+      etcdctl
       --cert /etc/kubernetes/pki/etcd/peer.crt
       --key /etc/kubernetes/pki/etcd/peer.key
       --cacert /etc/kubernetes/pki/etcd/ca.crt
-      --endpoints="{{ etcd_cluster }}" endpoint status --cluster -w table
-  register: cluster_status
+      --endpoints="{{ setup_etcd_cluster_etcd_cluster }}" endpoint status --cluster -w table
+  changed_when: false
+  register: setup_etcd_cluster_cluster_status
+  run_once: true
 
-- debug:
-    msg: "{{ cluster_status.stdout }}"
+- name: Print out cluster status
+  ansible.builtin.debug:
+    msg: "{{ setup_etcd_cluster_cluster_status.stdout }}"
 
-- debug:
-    msg: "{{ cluster_status.stderr }}"
-    when: "{{ cluster_status.stderr }} != ''"
+- name: Print out errors
+  ansible.builtin.debug:
+    msg: "{{ setup_etcd_cluster_cluster_status.stderr }}"

@@ -1,58 +1,55 @@
 ---
-
 - name: Generate and fetch keys if setup is needed
+  when: setup_ssh_keys_between_hosts_for_ansible_user or setup_ssh_keys_between_hosts_for_root
   block:
+    - name: Build a list of all other hosts to connect to
+      ansible.builtin.set_fact:
+        setup_ssh_keys_between_hosts_other_hosts: "{{ ansible_play_hosts | reject('search', ansible_host) }}"
 
-  - ansible.builtin.set_fact:
-      other_hosts: "{{ ansible_play_hosts | reject('search', ansible_host) }}"
+    - name: Ensure ~/.ssh directory exists
+      become: false
+      ansible.builtin.file:
+        path: ~/.ssh/
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0775"
 
-  - name: Ensure ~/.ssh directory exists
-    become: false
-    ansible.builtin.file:
-      path: ~/.ssh/
-      state: directory
+    - name: Generate an OpenSSH keypair with the default values (4096 bits, rsa)
+      become: false
+      community.crypto.openssh_keypair:
+        path: ~/.ssh/id_rsa
 
-  - name: Generate an OpenSSH keypair with the default values (4096 bits, rsa)
-    become: false
-    community.crypto.openssh_keypair:
-      path: ~/.ssh/id_rsa
+    - name: Fetch public key from host
+      become: false
+      ansible.builtin.fetch:
+        src: ~/.ssh/id_rsa.pub
+        dest: "/tmp/{{ ansible_host }}_id_rsa.pub"
+        flat: true
 
-  - name: Fetch public key from host
-    become: false
-    ansible.builtin.fetch:
-      src: ~/.ssh/id_rsa.pub
-      dest: "/tmp/{{ ansible_host }}_id_rsa.pub"
-      flat: true
-
-  when: setup_ssh_keys_for_ansible_user or setup_ssh_keys_for_root
-
-- ansible.builtin.set_fact:
-    current_public_key: "/tmp/{{ ansible_host }}_id_rsa.pub"
+- name: Set public key location
+  ansible.builtin.set_fact:
+    setup_ssh_keys_between_hosts_current_public_key: "/tmp/{{ ansible_host }}_id_rsa.pub"
 
 - name: Setup keys for ansible user between hosts
+  when: setup_ssh_keys_between_hosts_for_ansible_user
   block:
-
-  - name: Set up authorized keys for ansible user to other nodes
-    become: false
-    ansible.posix.authorized_key:
-      user: "{{ hostvars[item]['ansible_user'] }}"
-      state: present
-      key: "{{ lookup('file', current_public_key) }}"
-    delegate_to: "{{ item }}"
-    loop: "{{ other_hosts | default([]) }}"
-
-  when: setup_ssh_keys_for_ansible_user
+    - name: Set up authorized keys for ansible user to other nodes
+      become: false
+      ansible.posix.authorized_key:
+        user: "{{ hostvars[item]['ansible_user'] }}"
+        state: present
+        key: "{{ lookup('file', setup_ssh_keys_between_hosts_current_public_key) }}"
+      delegate_to: "{{ item }}"
+      loop: "{{ setup_ssh_keys_between_hosts_other_hosts | default([]) }}"
 
 - name: Setup keys for root user between hosts
+  when: setup_ssh_keys_between_hosts_for_root
   block:
-
-  - name: Set up authorized keys for ansible user to other nodes
-    ansible.posix.authorized_key:
-      user: root
-      state: present
-      key: "{{ lookup('file', current_public_key) }}"
-    delegate_to: "{{ item }}"
-    loop: "{{ other_hosts | default([]) }}"
-
-  when: setup_ssh_keys_for_root
-
+    - name: Set up authorized keys for ansible user to other nodes
+      ansible.posix.authorized_key:
+        user: root
+        state: present
+        key: "{{ lookup('file', setup_ssh_keys_between_hosts_current_public_key) }}"
+      delegate_to: "{{ item }}"
+      loop: "{{ setup_ssh_keys_between_hosts_other_hosts | default([]) }}"

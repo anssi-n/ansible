@@ -5,7 +5,7 @@
       - ca-certificates
       - curl
     state: present
-    update_cache: yes
+    update_cache: true
     cache_valid_time: 3600
 
 - name: Ensure keyrings directory exists
@@ -14,7 +14,7 @@
     state: directory
     owner: root
     group: root
-    mode: '0755'
+    mode: "0755"
 
 - name: Add Docker official repository
   ansible.builtin.deb822_repository:
@@ -31,49 +31,88 @@
     name:
       - containerd.io
     state: present
-    update_cache: yes
-  register: pkg_install
+    update_cache: true
+  register: containerd_pkg_install
 
 - name: Set was_installed variable
   ansible.builtin.set_fact:
-    containerd_installed: "{{ pkg_install.changed }}"
+    containerd_installed: "{{ containerd_pkg_install.changed }}"
 
 - name: Download cni plugings
   ansible.builtin.get_url:
-    url: "https://github.com/containernetworking/plugins/releases/download/{{ cni_plugins_version }}/cni-plugins-linux-amd64-{{ cni_plugins_version }}.tgz"
-    dest: "/tmp/cni-plugins-linux-amd64-{{ cni_plugins_version }}.tgz"
-    checksum: "sha512:https://github.com/containernetworking/plugins/releases/download/{{ cni_plugins_version }}/cni-plugins-linux-amd64-{{ cni_plugins_version }}.tgz.sha512"
+    url:
+      "https://github.com/containernetworking/plugins/releases/download/{{ containerd_cni_plugins_version }}\
+      /cni-plugins-linux-amd64-{{ containerd_cni_plugins_version }}.tgz"
+    dest: "/tmp/cni-plugins-linux-amd64-{{ containerd_cni_plugins_version }}.tgz"
+    owner: root
+    group: root
+    mode: "0755"
+    checksum:
+      "sha512:https://github.com/containernetworking/plugins/releases/download/\
+      {{ containerd_cni_plugins_version }}/cni-plugins-linux-amd64-{{ containerd_cni_plugins_version }}.tgz.sha512"
 
 - name: Create target directory for cni plugins
   ansible.builtin.file:
-    path: "{{ cni_plugins_target_dir }}"
+    path: "{{ containerd_cni_plugins_target_dir }}"
     state: directory
+    owner: root
+    group: root
+    mode: "0775"
 
 - name: Install cni plugings
   ansible.builtin.unarchive:
-    src: "/tmp/cni-plugins-linux-amd64-{{ cni_plugins_version }}.tgz"
-    dest: "{{ cni_plugins_target_dir }}"
-    copy: false
-    creates: "{{ cni_plugins_target_dir }}/README.md"
+    src: "/tmp/cni-plugins-linux-amd64-{{ containerd_cni_plugins_version }}.tgz"
+    dest: "{{ containerd_cni_plugins_target_dir }}"
+    remote_src: true
+    creates: "{{ containerd_cni_plugins_target_dir }}/README.md"
 
-- block:
+- name: Remove temporary archive file
+  ansible.builtin.file:
+    path: "/tmp/cni-plugins-linux-amd64-{{ containerd_cni_plugins_version }}.tgz"
+    state: absent
 
-  - name: Create default config for containerd
-    ansible.builtin.shell:
-      cmd: containerd config default > /etc/containerd/config.toml
-
-  - name: Set systemd cgroup driver
-    ansible.builtin.replace:
-      path: /etc/containerd/config.toml
-      regexp: "^( +)SystemdCgroup = false"
-      replace: "\\1SystemdCgroup = true"
-      backup: yes
-
-  - name: Set sandbox image version
-    ansible.builtin.replace:
-      path: /etc/containerd/config.toml
-      regexp: "^( +)(sandbox_image|sandbox) = .*"
-      replace: "\\1\\2 = '{{ containerd_sandbox_image }}'"
-
+- name: Configure containerd
   when: containerd_installed
   notify: restart containerd
+  block:
+    - name: Create default config for containerd
+      ansible.builtin.shell:
+        cmd: containerd config default > /etc/containerd/config.toml
+      changed_when: false
+
+    - name: Set systemd cgroup driver
+      ansible.builtin.replace:
+        path: /etc/containerd/config.toml
+        regexp: "^( +)SystemdCgroup = false"
+        replace: "\\1SystemdCgroup = true"
+        backup: true
+
+    - name: Set sandbox image version
+      ansible.builtin.replace:
+        path: /etc/containerd/config.toml
+        regexp: "^( +)(sandbox_image|sandbox) = .*"
+        replace: "\\1\\2 = '{{ containerd_sandbox_image }}'"
+
+# Install crictl
+
+- name: Download crictl
+  ansible.builtin.get_url:
+    url:
+      "https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ containerd_crictl_version }}\
+      /crictl-{{ containerd_crictl_version }}-linux-amd64.tar.gz"
+    dest: "/tmp/crictl-{{ containerd_crictl_version }}-linux-amd64.tar.gz"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install crictl
+  ansible.builtin.unarchive:
+    src: "/tmp/crictl-{{ containerd_crictl_version }}-linux-amd64.tar.gz"
+    dest: /usr/local/bin
+    remote_src: true
+    creates: "/usr/local/bin/crictl"
+
+- name: Remove temporary archive file
+  ansible.builtin.file:
+    path: "/tmp/crictl-{{ containerd_crictl_version }}-linux-amd64.tar.gz"
+    state: absent

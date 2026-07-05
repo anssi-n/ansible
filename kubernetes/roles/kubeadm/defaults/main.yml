@@ -1,2 +1,2 @@
 ---
-kubernetes_version: "v1.36"
+kubeadm_kubernetes_version: "v1.36"

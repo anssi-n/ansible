@@ -2,18 +2,18 @@
 apiVersion: "kubeadm.k8s.io/v1beta4"
 kind: InitConfiguration
 nodeRegistration:
-    name: "{{ etcd_names[idx] }}"
+    name: "{{ setup_etcd_cluster_etcd_names[idx] }}"
 localAPIEndpoint:
-    advertiseAddress: "{{ etcd_hosts[idx] }}"
+    advertiseAddress: "{{ setup_etcd_cluster_etcd_hosts[idx] }}"
 ---
 apiVersion: "kubeadm.k8s.io/v1beta4"
 kind: ClusterConfiguration
 etcd:
     local:
         serverCertSANs:
-        - "{{ etcd_hosts[idx] }}"
+        - "{{ setup_etcd_cluster_etcd_hosts[idx] }}"
         peerCertSANs:
-        - "{{ etcd_hosts[idx] }}"
+        - "{{ setup_etcd_cluster_etcd_hosts[idx] }}"
         extraArgs:
         - name: initial-cluster
           value: {{ ''}} {%- for host in groups['etcd_nodes'] -%}
@@ -23,13 +23,13 @@ etcd:
         - name: initial-cluster-state
           value: new
         - name: name
-          value: "{{ etcd_names[idx] }}"
+          value: "{{ setup_etcd_cluster_etcd_names[idx] }}"
         - name: listen-peer-urls
-          value: "https://{{ etcd_hosts[idx] }}:2380"
+          value: "https://{{ setup_etcd_cluster_etcd_hosts[idx] }}:2380"
         - name: listen-client-urls
-          value: "https://{{ etcd_hosts[idx] }}:2379"
+          value: "https://{{ setup_etcd_cluster_etcd_hosts[idx] }}:2379"
         - name: advertise-client-urls
-          value: "https://{{ etcd_hosts[idx] }}:2379"
+          value: "https://{{ setup_etcd_cluster_etcd_hosts[idx] }}:2379"
         - name: initial-advertise-peer-urls
-          value: "https://{{ etcd_hosts[idx] }}:2380"
+          value: "https://{{ setup_etcd_cluster_etcd_hosts[idx] }}:2380"
 

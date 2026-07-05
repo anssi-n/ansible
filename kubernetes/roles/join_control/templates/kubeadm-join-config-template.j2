@@ -4,17 +4,17 @@ kind: JoinConfiguration
 
 discovery:
   bootstrapToken:
-    token: "{{ join_token }}"
-    apiServerEndpoint: "{{ api_server_endpoint }}"
+    token: "{{ join_control_join_token }}"
+    apiServerEndpoint: "{{ join_control_api_server_endpoint }}"
     caCertHashes:
-      - "{{ ca_cert_hash }}"
+      - "{{ join_control_ca_cert_hash }}"
 
-{% if cert_key is defined %}
+{% if join_control_cert_key is defined %}
 controlPlane:
   localAPIEndpoint:
     advertiseAddress: {{ ansible_host }}
     bindPort: 6443
-  certificateKey: "{{ cert_key }}"
+  certificateKey: "{{ join_control_cert_key }}"
 {% endif %}
 
 nodeRegistration:
@@ -23,11 +23,11 @@ nodeRegistration:
       value: {{ ansible_host }}
 
 networking:
-  podSubnet: "{{ pod_network_cidr }}"
-  serviceSubnet: "{{ service_network_cidr }}"
+  podSubnet: "{{ init_cluster_pod_network_cidr }}"
+  serviceSubnet: "{{ init_cluster_service_network_cidr }}"
 
 apiServer:
-  certSANs: {{ apiserver_cert_extra_sans | safe | replace('\'', '\"') }}
+  certSANs: {{ init_cluster_apiserver_cert_extra_sans | safe | replace('\'', '\"') }}
   extraArgs:
     - name: bind-address
       value: "0.0.0.0"
@@ -42,7 +42,7 @@ scheduler:
     - name: bind-address
       value: "0.0.0.0"
 
-{% if not external_etcd %}
+{% if not join_control_external_etcd %}
 etcd:
   local:
     serverCertSANs:

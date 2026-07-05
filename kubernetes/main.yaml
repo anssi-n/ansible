@@ -1,8 +1,0 @@
----
-- name: ensure apiserver is running
-  ansible.builtin.command:
-    cmd: crictl ps --label io.kubernetes.container.name=kube-apiserver --output json
-  register: apiserver_status
-  until: apiserver_status.stdout | from_json | json_query('containers[0].state') == "CONTAINER_RUNNING"
-  retries: "{{ (apiserver_timeout | default(120))/5 | int }}"
-  delay: 5

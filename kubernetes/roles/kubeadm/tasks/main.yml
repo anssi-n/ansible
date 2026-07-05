@@ -2,15 +2,17 @@
 # Disable swap
 
 - name: Disable swap for current session
-  command: swapoff -a
+  ansible.builtin.command:
+    cmd: swapoff -a
+  changed_when: false
   when: ansible_facts["swaptotal_mb"] > 0
 
 - name: Disable swap permanently
-  replace:
+  ansible.builtin.replace:
     path: /etc/fstab
     regexp: '^(\s*)([^#\n]+\s+)(\w+\s+)swap(\s+.*)$'
     replace: '#\1\2\3swap\4'
-    backup: yes
+    backup: true
   when: ansible_facts["swaptotal_mb"] > 0
 
 # Load required kernel modules
@@ -32,19 +34,19 @@
 - name: Set net.bridge.bridge-nf-call-iptables
   ansible.posix.sysctl:
     name: net.bridge.bridge-nf-call-iptables
-    value: '1'
+    value: "1"
     state: present
 
 - name: Set net.bridge.bridge-nf-call-iptables
   ansible.posix.sysctl:
     name: net.bridge.bridge-nf-call-ip6tables
-    value: '1'
+    value: "1"
     state: present
 
 - name: Set net.bridge.bridge-nf-call-iptables
   ansible.posix.sysctl:
     name: net.ipv4.ip_forward
-    value: '1'
+    value: "1"
     state: present
 
 # Install kubeadm, kubelet and kubectl
@@ -57,22 +59,22 @@
       - apt-transport-https
       - gpg
     state: present
-    update_cache: yes
+    update_cache: true
     cache_valid_time: 3600
 
 - name: Ensure keyrings directory exists
   ansible.builtin.file:
     path: /etc/apt/keyrings
     state: directory
-    mode: '0755'
+    mode: "0755"
 
 - name: Add Kubernetes official repository
   ansible.builtin.deb822_repository:
     name: kubernetes
     types: [deb]
-    uris: "https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/deb/"
+    uris: "https://pkgs.k8s.io/core:/stable:/{{ kubeadm_kubernetes_version }}/deb/"
     suites: /
-    signed_by: "https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/deb/Release.key"
+    signed_by: "https://pkgs.k8s.io/core:/stable:/{{ kubeadm_kubernetes_version }}/deb/Release.key"
     state: present
 
 - name: Install kubeadm, kubelet and kubectl
@@ -82,12 +84,12 @@
       - kubelet
       - kubectl
     state: present
-    update_cache: yes
-  register: pkg_install
+    update_cache: true
+  register: kubeadm_pkg_install
 
 - name: Set was_installed variable
   ansible.builtin.set_fact:
-    kubeadm_installed: "{{ pkg_install.changed }}"
+    kubeadm_installed: "{{ kubeadm_pkg_install.changed }}"
 
 - name: Hold Kubernetes packages
   ansible.builtin.dpkg_selections:
