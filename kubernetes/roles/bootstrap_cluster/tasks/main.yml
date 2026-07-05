@@ -1,8 +1,8 @@
 ---
 - name: Ensure github pat is provided
   ansible.builtin.fail:
-    msg: Github PAT must be provided in boostrap_cluster_github_pat variable
-  when: boostrap_cluster_github_pat is not defined
+    msg: Github PAT must be provided in bootstrap_cluster_github_pat variable
+  when: bootstrap_cluster_github_pat is not defined
 
 - name: Check if flux-system namespace exists
   ansible.builtin.command:
@@ -10,12 +10,12 @@
   changed_when: false
   register: bootstrap_cluster_fluxcd_ns
 
-- name: Set cluster Check if cluster if already boostrapped
+- name: Set cluster Check if cluster if already bootstrapped
   ansible.builtin.set_fact:
-    bootstrap_cluster_boostrapped: "{{ (bootstrap_cluster_fluxcd_ns.stdout != '') | bool }}"
+    bootstrap_cluster_bootstrapped: "{{ (bootstrap_cluster_fluxcd_ns.stdout != '') | bool }}"
 
 - name: Bootstrap cluster
-  when: not bootstrap_cluster_boostrapped
+  when: not bootstrap_cluster_bootstrapped
   block:
     - name: Bootrap cluster
       ansible.builtin.command:
@@ -30,4 +30,4 @@
       timeout: "{{ bootstrap_cluster_timeout }}"
       register: bootstrap_cluster_result
       environment:
-        GITHUB_TOKEN: "{{ boostrap_cluster_github_pat }}"
+        GITHUB_TOKEN: "{{ bootstrap_cluster_github_pat }}"

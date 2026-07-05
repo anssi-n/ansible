@@ -27,7 +27,7 @@
       when: install_containerd | default(true) | bool
     - role: kubeadm
     - role: setup_ssh_keys_between_hosts
-      setup_ssh_keys_between_hosts_for_ansible_user: true
+      setup_ssh_keys_between_hosts_for_ansible_user: false
       setup_ssh_keys_between_hosts_for_root: false
 
 - name: Setup external etcd cluster
@@ -116,9 +116,25 @@
   become: true
   tags: [bootstrap_cluster]
 
-  # Note! Boostrapping requires Github pat in variable boostrap_cluster_github_pat
+  # Note! Bootstrapping requires Github pat in variable bootstrap_cluster_github_pat
   vars_files:
     - k8s_vars.yaml
+
+  pre_tasks:
+    - name: Get Github pat from Hashicorp Vault
+      community.hashi_vault.vault_kv2_get:
+        url: "{{ lookup('env', 'VAULT_ADDR') }}"
+        path: "{{ vault_path }}"
+        engine_mount_point: "{{ vault_mount_point }}"
+        auth_method: approle
+        role_id: "{{ lookup('env', 'VAULT_ROLE_ID') }}"
+        secret_id: "{{ lookup('env', 'VAULT_SECRET_ID') }}"
+      register: vault_secret
+      delegate_to: localhost
+
+    - name: Set Github pat to variable
+      ansible.builtin.set_fact:
+        bootstrap_cluster_github_pat: "{{ vault_secret.secret.homelab_pat }}"
 
   roles:
     - role: bootstrap_cluster

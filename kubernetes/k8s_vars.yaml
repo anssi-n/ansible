@@ -58,3 +58,5 @@ bootstrap_cluster_github_owner: anssi-n
 bootstrap_cluster_github_repository: homelab
 bootstrap_cluster_github_repository_path: clusters/ansible
 bootstrap_cluster_timeout: 180
+vault_path: github
+vault_mount_point: k8s/homelab
