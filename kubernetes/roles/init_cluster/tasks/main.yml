@@ -58,42 +58,10 @@
 #   when: multiple_control_plane_nodes
 #   run_once: true
 
-# Setup kubeconfig for root user
-- name: Ensure ~/.kube directory exists
-  ansible.builtin.file:
-    path: ~/.kube
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
-- name: Copy admin.conf to .kube directory
-  ansible.builtin.copy:
-    src: /etc/kubernetes/admin.conf
-    dest: ~/.kube/config
-    owner: root
-    group: root
-    mode: "0755"
-    remote_src: true
-
-# Setup kubeconfig for ansible user
-- name: Ensure ~/.kube directory exists
-  become: false
-  ansible.builtin.file:
-    path: ~/.kube
-    state: directory
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-    mode: "0755"
-
-- name: Copy admin.conf to .kube directory
-  ansible.builtin.copy:
-    src: /etc/kubernetes/admin.conf
-    dest: /home/vagrant/.kube/config
-    remote_src: true
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-    mode: "0755"
+- name: Setup kubeconfig foor root and ansible user
+  ansible.builtin.include_role:
+    name: common_utils
+    tasks_from: setup_kubeconfig.yaml
 
 - name: Get loadbalancer node if available
   ansible.builtin.set_fact:

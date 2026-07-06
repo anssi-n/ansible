@@ -1,2 +1,2 @@
-kubernetes/roles/common_handlers/handlers/main.yml name[casing]
+kubernetes/roles/common_utils/handlers/main.yml name[casing]
 kubernetes/roles/request_kubelet_serving_cert/handlers/main.yml name[casing]

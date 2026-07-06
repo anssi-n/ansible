@@ -66,6 +66,8 @@
 
   roles:
     - role: join_control
+    - role: install_helm
+    - role: install_fluxcd
 
 - name: Join all worker nodes to cluster
   hosts: worker_nodes

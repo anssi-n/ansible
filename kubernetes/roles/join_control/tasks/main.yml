@@ -60,3 +60,8 @@
         cmd: kubeadm join --config /tmp/kubeadm-join-config.yaml
         creates: /etc/kubernetes/pki
       register: join_control_output
+
+    - name: Setup kubeconfig foor root and ansible user
+      ansible.builtin.include_role:
+        name: common_utils
+        tasks_from: setup_kubeconfig.yaml
