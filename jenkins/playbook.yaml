@@ -1,0 +1,73 @@
+---
+- name: Dynamic Kubernetes Target Infrastructure Setup
+  hosts: localhost
+  gather_facts: false
+  vars:
+    jenkins_agent_namespace: "jenkins-agents"
+    pod_names:
+      - ansible-target-1
+      - ansible-target-2
+      - ansible-target-3
+
+  tasks:
+    - name: Spin up 3 target pods
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: "{{ item }}"
+            namespace: "{{ jenkins_agent_namespace }}"
+            labels:
+              app: ansible-test-target
+          spec:
+            containers:
+              - name: target
+                image: ubuntu:latest # Or any base image you want to test against
+                command: ["/bin/sh", "-c", "while true; do sleep 30; done"] # Keep pod alive
+        state: present
+      loop: "{{ pod_names }}"
+
+    - name: Wait for pods to be running and ready
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ jenkins_agent_namespace }}"
+        name: "{{ item }}"
+      register: pod_info
+      until: "pod_info.resources | length > 0 and pod_info.resources[0].status.phase == 'Running'"
+      retries: 10
+      delay: 5
+      loop: "{{ pod_names }}"
+
+    - name: Dynamically add pods to the Ansible in-memory inventory
+      ansible.builtin.add_host:
+        name: "{{ item }}"
+        ansible_connection: community.kubernetes.k8s
+        ansible_kubernetes_namespace: "{{ jenkins_agent_namespace }}"
+        ansible_kubernetes_container: target
+        groups: dynamic_targets
+      loop: "{{ pod_names }}"
+
+- name: Run Playbook Tests Against Dynamic Pods
+  hosts: dynamic_targets
+  gather_facts: false # Set to true if your target image has python installed
+
+  tasks:
+    - name: Test command inside the Kubernetes pod
+      ansible.builtin.raw: hostname
+      changed_when: false
+
+- name: Teardown Infrastructure
+  hosts: localhost
+  gather_facts: false
+  vars:
+    jenkins_agent_namespace: "jenkins-agents"
+    pod_names: [ansible-target-1, ansible-target-2, ansible-target-3]
+  tasks:
+    - name: Destroy the 3 target pods
+      kubernetes.core.k8s:
+        kind: Pod
+        namespace: "{{ jenkins_agent_namespace }}"
+        name: "{{ item }}"
+        state: absent
+      loop: "{{ pod_names }}"

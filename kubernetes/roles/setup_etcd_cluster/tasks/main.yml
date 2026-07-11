@@ -260,16 +260,21 @@
   loop: "{{ groups['etcd_nodes'] }}"
   run_once: true
 
+- name: Wait for ports 2379 and 2380 to become open on  etcd hosts
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ item }}"
+    timeout: 30
+  loop:
+    - 2379
+    - 2380
+
 # 8. Optional: Check the cluster health.
 
 - name: Create string of all etcd cluster nodes for etcdctl endpoints parameter value
   ansible.builtin.set_fact:
     setup_etcd_cluster_etcd_cluster: >-
       "{%- for host in groups['etcd_nodes'] -%}https://{{ hostvars[host].ansible_host }}:2379{% if not loop.last %},{% endif %}{%- endfor -%}"
-
-- name: Wait for the etcd cluster to start
-  ansible.builtin.pause:
-    minutes: 1
 
 - name: Check etcd cluster status
   ansible.builtin.command:
