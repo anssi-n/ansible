@@ -70,10 +70,6 @@
       register: svc_info
       loop: "{{ pod_names }}"
 
-    - name: Print service pod_info
-      ansible.builtin.debug:
-        var: svc_info
-
     - name: Dynamically add pods to the Ansible in-memory inventory
       ansible.builtin.add_host:
         name: "{{ item }}"
@@ -84,6 +80,19 @@
 
         groups: dynamic_targets
       loop: "{{ pod_names }}"
+
+    - name: Print service IPs
+      ansible.builtin.debug:
+        msg: "Host {{ item.item }} with service IP {{ item.resources[0].spec.clusterIP }}"
+      loop: "{{ svc_info.results }}"
+
+    - name: Print out all vars for dynamic_targets group
+      ansible.builtin.debug:
+        msg: "{{ hostvars[groups['dynamic_targets'][0]] }}"
+
+    - name: Print out all facts
+      ansible.builtin.debug:
+        var: ansible_facts
 
 - name: Run Playbook Tests Against Dynamic Pods
   hosts: dynamic_targets
