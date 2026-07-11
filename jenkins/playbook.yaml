@@ -54,9 +54,24 @@
   gather_facts: false # Set to true if your target image has python installed
 
   tasks:
-    - name: Test command inside the Kubernetes pod
+    - name: Test raw command inside the Kubernetes pod
       ansible.builtin.raw: hostname
       changed_when: false
+
+    - name: Test command plugin inside the Kubernetes pod
+      ansible.builtin.command: hostname
+      changed_when: false
+
+    - name: Test shell plugin inside the Kubernetes pod
+      ansible.builtin.shell: >
+        hostname
+        whoami
+      changed_when: false
+
+    - name: Test apt plugin inside the Kubernetes pod
+      ansible.builtin.apt:
+        name: nginx
+        state: present
 
 - name: Teardown Infrastructure
   hosts: localhost
