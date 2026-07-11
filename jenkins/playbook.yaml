@@ -97,6 +97,7 @@
 
 - name: Run Playbook Tests Against Dynamic Pods
   hosts: dynamic_targets
+  gather_facts: false
   become: true
 
   tasks:
