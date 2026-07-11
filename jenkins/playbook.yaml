@@ -19,7 +19,7 @@
             name: "{{ item }}"
             namespace: "{{ jenkins_agent_namespace }}"
             labels:
-              app: ansible-test-target
+              app: "ansible-test-target-{{ item }}"
           spec:
             containers:
               - name: target
@@ -39,6 +39,41 @@
       delay: 5
       loop: "{{ pod_names }}"
 
+    - name: Expose ports on target pods
+      kubernetes.core.k8s:
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: "{{ item }}-svc"
+            namespace: "{{ jenkins_agent_namespace }}"
+          spec:
+            selector:
+              app: "ansible-test-target-{{ item }}"
+            ports:
+              - name: etcd-client
+                protocol: TCP
+                port: 2379
+                targetPort: 2379
+              - name: etcd-peer
+                protocol: TCP
+                port: 2380
+                targetPort: 2380
+        state: present
+      loop: "{{ pod_names }}"
+
+    - name: Get service IP addresses
+      kubernetes.core.k8s_info:
+        kind: Service
+        namespace: "{{ jenkins_agent_namespace }}"
+        name: "{{ item }}-svc"
+      register: svc_info
+      loop: "{{ pod_names }}"
+
+    - name: Print service pod_info
+      ansible.builtin.debug:
+        var: svc_info
+
     - name: Dynamically add pods to the Ansible in-memory inventory
       ansible.builtin.add_host:
         name: "{{ item }}"
@@ -56,9 +91,9 @@
   become: true
 
   tasks:
-    - name: Print out facts
-      ansible.builtin.debug:
-        msg: "{{ hostvars[ansible_host] }}"
+    # - name: Print out facts
+    #   ansible.builtin.debug:
+    #     msg: "{{ hostvars[ansible_host] }}"
 
     - name: Test raw command inside the Kubernetes pod
       ansible.builtin.raw: hostname
@@ -91,5 +126,13 @@
         kind: Pod
         namespace: "{{ jenkins_agent_namespace }}"
         name: "{{ item }}"
+        state: absent
+      loop: "{{ pod_names }}"
+
+    - name: Delete services
+      kubernetes.core.k8s:
+        kind: Service
+        namespace: "{{ jenkins_agent_namespace }}"
+        name: "{{ item }}-svc"
         state: absent
       loop: "{{ pod_names }}"
