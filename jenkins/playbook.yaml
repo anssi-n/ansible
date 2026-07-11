@@ -52,7 +52,7 @@
 - name: Run Playbook Tests Against Dynamic Pods
   hosts: dynamic_targets
   gather_facts: false # Set to true if your target image has python installed
-
+  become: true
   tasks:
     - name: Test raw command inside the Kubernetes pod
       ansible.builtin.raw: hostname
@@ -65,7 +65,6 @@
     - name: Test shell plugin inside the Kubernetes pod
       ansible.builtin.shell: >
         hostname
-        whoami
       changed_when: false
 
     - name: Test apt plugin inside the Kubernetes pod
