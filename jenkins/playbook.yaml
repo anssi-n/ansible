@@ -70,10 +70,6 @@
       register: svc_info
       loop: "{{ pod_names }}"
 
-    - name: Print out mapping
-      ansible.builtin.debug:
-        var: svc_info
-
     - name: Create mappng for pod name to service IPs
       ansible.builtin.set_fact:
         pod_to_ip_map: "{{ pod_to_ip_map | default({}) | combine({item.item: item.resources[0].spec.clusterIP}) }}"
@@ -90,13 +86,13 @@
         ansible_kubernetes_namespace: "{{ jenkins_agent_namespace }}"
         ansible_kubernetes_container: target
         ansible_python_interpreter: /usr/bin/python3.14
-        ansible_host: "{{ pod_to_ip_map[item] }}"
         groups: dynamic_targets
       loop: "{{ pod_names }}"
 
     - name: Print out all vars for dynamic_targets group
       ansible.builtin.debug:
-        msg: "{{ hostvars[groups['dynamic_targets'][0]] }}"
+        msg: "{{ hostvars[item] }}"
+      loop: "{{ pod_names }}"
 
 - name: Run Playbook Tests Against Dynamic Pods
   hosts: dynamic_targets
