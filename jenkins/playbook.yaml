@@ -42,9 +42,10 @@
     - name: Dynamically add pods to the Ansible in-memory inventory
       ansible.builtin.add_host:
         name: "{{ item }}"
-        ansible_connection: community.kubernetes.k8s
+        ansible_connection: kubernetes.core.kubectl
         ansible_kubernetes_namespace: "{{ jenkins_agent_namespace }}"
         ansible_kubernetes_container: target
+
         groups: dynamic_targets
       loop: "{{ pod_names }}"
 
