@@ -23,7 +23,7 @@
           spec:
             containers:
               - name: target
-                image: ubuntu:latest # Or any base image you want to test against
+                image: bobfleming/ansible-host:0.0.1 # Or any base image you want to test against
                 command: ["/bin/sh", "-c", "while true; do sleep 30; done"] # Keep pod alive
         state: present
       loop: "{{ pod_names }}"
