@@ -58,7 +58,7 @@
   tasks:
     - name: Print out facts
       ansible.builtin.debug:
-        var: hostvars["{{ ansible_host }}"]
+        msg: "{{ hostvars[ansible_host] }}"
 
     - name: Test raw command inside the Kubernetes pod
       ansible.builtin.raw: hostname
