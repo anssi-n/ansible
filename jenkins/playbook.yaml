@@ -23,7 +23,7 @@
           spec:
             containers:
               - name: target
-                image: bobfleming/ansible-host:0.0.2 # Or any base image you want to test against
+                image: bobfleming/ansible-host:0.0.2
                 command: ["/bin/sh", "-c", "while true; do sleep 30; done"] # Keep pod alive
         state: present
       loop: "{{ pod_names }}"
@@ -35,7 +35,7 @@
         name: "{{ item }}"
       register: pod_info
       until: "pod_info.resources | length > 0 and pod_info.resources[0].status.phase == 'Running'"
-      retries: 10
+      retries: 20
       delay: 5
       loop: "{{ pod_names }}"
 
@@ -45,16 +45,21 @@
         ansible_connection: kubernetes.core.kubectl
         ansible_kubernetes_namespace: "{{ jenkins_agent_namespace }}"
         ansible_kubernetes_container: target
+        ansible_python_interpreter: /usr/bin/python3.14
 
         groups: dynamic_targets
       loop: "{{ pod_names }}"
 
 - name: Run Playbook Tests Against Dynamic Pods
   hosts: dynamic_targets
-  gather_facts: false # Set to true if your target image has python installed
+  gather_facts: true # Set to true if your target image has python installed
   become: true
 
   tasks:
+    - name: Print out facts
+      ansible.builtin.debug:
+        var: hostvars["{{ ansible_host }}"]
+
     - name: Test raw command inside the Kubernetes pod
       ansible.builtin.raw: hostname
       changed_when: false
