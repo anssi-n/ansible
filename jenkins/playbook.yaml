@@ -60,6 +60,7 @@
 - name: Teardown Infrastructure
   hosts: localhost
   gather_facts: false
+  tags: [teardown]
   vars:
     jenkins_agent_namespace: "jenkins-agents"
     pod_names: [ansible-target-1, ansible-target-2, ansible-target-3]
