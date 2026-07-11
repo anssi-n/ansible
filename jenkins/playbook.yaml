@@ -70,6 +70,10 @@
       register: svc_info
       loop: "{{ pod_names }}"
 
+    - name: Print out mapping
+      ansible.builtin.debug:
+        var: svc_info
+
     - name: Create mappng for pod name to service IPs
       ansible.builtin.set_fact:
         pod_to_ip_map: "{{ host_ip_map | default({}) | combine({item.item: item.resources[0].spec.clusterIP}) }}"
