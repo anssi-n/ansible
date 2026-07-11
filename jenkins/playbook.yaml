@@ -75,6 +75,10 @@
         pod_to_ip_map: "{{ host_ip_map | default({}) | combine({item.item: item.resources[0].spec.clusterIP}) }}"
       loop: "{{ svc_info.results }}"
 
+    - name: Print out mapping
+      ansible.builtin.debug:
+        var: pod_to_ip_map
+
     - name: Dynamically add pods to the Ansible in-memory inventory
       ansible.builtin.add_host:
         name: "{{ item }}"
