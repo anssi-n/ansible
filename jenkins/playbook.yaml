@@ -86,6 +86,7 @@
         ansible_kubernetes_namespace: "{{ jenkins_agent_namespace }}"
         ansible_kubernetes_container: target
         ansible_python_interpreter: /usr/bin/python3.14
+        service_ip: "{{ pod_to_ip_map[item] }}"
         groups: dynamic_targets
       loop: "{{ pod_names }}"
 
