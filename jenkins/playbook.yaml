@@ -89,7 +89,9 @@
         ansible_python_interpreter: /usr/bin/python3.14
         ansible_kubectl_pod: "{{ item }}"
         ansible_host: "{{ pod_to_ip_map[item] }}"
-        groups: etcd_nodes
+        groups:
+          - etcd_nodes
+          - k8s_cluster
       loop: "{{ pod_names }}"
 
     - name: Print out all vars for dynamic_targets group
