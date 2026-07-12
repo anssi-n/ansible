@@ -1,6 +1,7 @@
 ---
 - name: Dynamic Kubernetes Target Infrastructure Setup
   hosts: localhost
+  tags: [setup_infra]
   gather_facts: false
   vars:
     jenkins_agent_namespace: "jenkins-agents"
