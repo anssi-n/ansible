@@ -5,9 +5,9 @@
   vars:
     jenkins_agent_namespace: "jenkins-agents"
     pod_names:
-      - ansible-target-1
-      - ansible-target-2
-      - ansible-target-3
+      - etcd-1
+      - etcd-2
+      - etcd-3
 
   tasks:
     - name: Spin up 3 target pods
@@ -88,7 +88,7 @@
         ansible_python_interpreter: /usr/bin/python3.14
         ansible_kubectl_pod: "{{ item }}"
         ansible_host: "{{ pod_to_ip_map[item] }}"
-        groups: dynamic_targets
+        groups: etcd_nodes
       loop: "{{ pod_names }}"
 
     - name: Print out all vars for dynamic_targets group
@@ -96,29 +96,32 @@
         msg: "{{ hostvars[item] }}"
       loop: "{{ pod_names }}"
 
-- name: Run Playbook Tests Against Dynamic Pods
-  hosts: dynamic_targets
-  gather_facts: false
-  become: true
+# - name: Run Playbook Tests Against Dynamic Pods
+#   hosts: dynamic_targets
+#   gather_facts: false
+#   become: true
 
-  tasks:
-    - name: Test raw command inside the Kubernetes pod
-      ansible.builtin.raw: hostname
-      changed_when: false
+#   tasks:
+#     - name: Test raw command inside the Kubernetes pod
+#       ansible.builtin.raw: hostname
+#       changed_when: false
 
-    - name: Test command plugin inside the Kubernetes pod
-      ansible.builtin.command: hostname
-      changed_when: false
+#     - name: Test command plugin inside the Kubernetes pod
+#       ansible.builtin.command: hostname
+#       changed_when: false
 
-    - name: Test shell plugin inside the Kubernetes pod
-      ansible.builtin.shell: >
-        hostname
-      changed_when: false
+#     - name: Test shell plugin inside the Kubernetes pod
+#       ansible.builtin.shell: >
+#         hostname
+#       changed_when: false
 
-    - name: Test apt plugin inside the Kubernetes pod
-      ansible.builtin.apt:
-        name: nginx
-        state: present
+#     - name: Test apt plugin inside the Kubernetes pod
+#       ansible.builtin.apt:
+#         name: nginx
+#         state: present
+
+- name: Include a play after another play
+  ansible.builtin.import_playbook: ../kubernetes/install-k8s.yaml
 
 - name: Teardown Infrastructure
   hosts: localhost
@@ -126,7 +129,7 @@
   tags: [teardown]
   vars:
     jenkins_agent_namespace: "jenkins-agents"
-    pod_names: [ansible-target-1, ansible-target-2, ansible-target-3]
+    pod_names: [etcd-1, etcd-2, etcd-3]
   tasks:
     - name: Destroy the 3 target pods
       kubernetes.core.k8s:
