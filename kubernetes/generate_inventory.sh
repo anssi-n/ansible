@@ -9,10 +9,10 @@ CONTROL_PLANE_NODES=${CONTROL_PLANE_NODES:-0}
 WORKER_NODES=${WORKER_NODES:-0}
 
 # Starting IPs
-LB_IP="192.168.56.10"
+LB_IP="192.168.59.20"
 ETCD_IP_BASE="192.168.59."
-CONTROL_IP_BASE="192.168.57."
-WORKER_IP_BASE="192.168.58."
+CONTROL_IP_BASE="192.168.59."
+WORKER_IP_BASE="192.168.59."
 
 OUTPUT_FILE="${1:-inventory.ini}"
 
@@ -42,7 +42,7 @@ cat >> "$OUTPUT_FILE" << EOF
 EOF
 if [ "$ETCD_NODES" -gt 0 ]; then
     for i in $(seq 1 "$ETCD_NODES"); do
-        ip=$((9 + i))
+        ip=$((10 + i - 1))
         echo "etcd-${i} ansible_host=${ETCD_IP_BASE}${ip}" >> "$OUTPUT_FILE"
     done
 fi
@@ -54,7 +54,7 @@ cat >> "$OUTPUT_FILE" << EOF
 EOF
 if [ "$CONTROL_PLANE_NODES" -gt 0 ]; then
     for i in $(seq 1 "$CONTROL_PLANE_NODES"); do
-        ip=$((10 + i - 1))
+        ip=$((30 + i - 1))
         echo "control-plane-${i} ansible_host=${CONTROL_IP_BASE}${ip}" >> "$OUTPUT_FILE"
     done
 fi
@@ -66,7 +66,7 @@ cat >> "$OUTPUT_FILE" << EOF
 EOF
 if [ "$WORKER_NODES" -gt 0 ]; then
     for i in $(seq 1 "$WORKER_NODES"); do
-        ip=$((10 + i - 1))
+        ip=$((50 + i - 1))
         echo "worker-${i} ansible_host=${WORKER_IP_BASE}${ip}" >> "$OUTPUT_FILE"
     done
 fi
