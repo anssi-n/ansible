@@ -44,7 +44,7 @@ Vagrant.configure("2") do |config|
     config.vm.define "control-#{i}" do |control|
       control.vm.box = "generic/ubuntu2204"
       control.vm.hostname = "control-#{i}"
-      control.vm.network "private_network", ip: "192.168.57.#{30 + i - 1}"
+      control.vm.network "private_network", ip: "192.168.59.#{30 + i - 1}"
       control.vm.provider "virtualbox" do |vb|
         vb.memory = "2048"
       end
@@ -55,7 +55,7 @@ Vagrant.configure("2") do |config|
     config.vm.define "worker-#{i}" do |worker|
       worker.vm.box = "generic/ubuntu2204"
       worker.vm.hostname = "worker-#{i}"
-      worker.vm.network "private_network", ip: "192.168.58.##{50 + i - 1}"
+      worker.vm.network "private_network", ip: "192.168.59.##{50 + i - 1}"
       worker.vm.provider "virtualbox" do |vb|
         vb.memory = "2048"
       end
