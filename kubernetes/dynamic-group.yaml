@@ -1,0 +1,78 @@
+---
+- name: Create dynamic groups
+  hosts: localhost
+  become: false
+  gather_facts: false
+
+  vars:
+    jenkins_agent_namespace: jenkins_agents
+    target_host_image: bobfleming/ansible-host:0.0.3
+    targets:
+      - group: lb_node
+        name_prefix: lb
+        number_of_hosts: 1
+        ports:
+          - name: api-server
+            protocol: TCP
+            port: 6443
+            targetPort: 6443
+      - group: etcd_nodes
+        name_prefix: etcd
+        number_of_hosts: 3
+        ports:
+          - name: etcd-client
+            protocol: TCP
+            port: 2379
+            targetPort: 2379
+          - name: etcd-peer
+            protocol: TCP
+            port: 2380
+            targetPort: 2380
+      - group: control_plane_nodes
+        name_prefix: control-plane
+        number_of_hosts: 3
+        ports:
+          - name: etcd-client
+            protocol: TCP
+            port: 2379
+            targetPort: 2379
+          - name: etcd-peer
+            protocol: TCP
+            port: 2380
+            targetPort: 2380
+          - name: api-server
+            protocol: TCP
+            port: 6443
+            targetPort: 6443
+          - name: kubelet
+            protocol: TCP
+            port: 10250
+            targetPort: 10250
+          - name: kube-scheduler
+            protocol: TCP
+            port: 10259
+            targetPort: 10259
+          - name: kube-controller-manager
+            protocol: TCP
+            port: 10257
+            targetPort: 10257
+      - group: worker_nodes
+        name_prefix: worker
+        number_of_hosts: 3
+        ports:
+          - name: kubelet
+            protocol: TCP
+            port: 10250
+            targetPort: 10250
+          - name: kube-proxy
+            protocol: TCP
+            port: 10256
+            targetPort: 10256
+
+  tasks:
+    - name: Create dynamic group of hosts
+      ansible.builtin.include_tasks:
+        file: create_dynamic_group.yaml
+      loop: "{{ targets }}"
+      loop_control:
+        loop_var: group

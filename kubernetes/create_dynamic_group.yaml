@@ -1,0 +1,68 @@
+- name: Spin up group pods
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: "{{ group.name_prefix }}-{{ item }}"
+        namespace: "{{ jenkins_agent_namespace }}"
+        labels:
+          app: "ansible-test-host-{{ group.name_prefix }}-{{ item }}"
+      spec:
+        containers:
+          - name: target
+            image: "{{ target_host_image }}"
+            command: ["/bin/sh", "-c", "tail -f /dev/null"]
+    state: present
+  with_sequence: start=1 end="{{ group.number_of_hosts }}"
+
+- name: Wait for pods to be running and ready
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ jenkins_agent_namespace }}"
+    name: "{{ group.name_prefix }}-{{ item }}"
+  register: pod_info
+  until: "pod_info.resources | length > 0 and pod_info.resources[0].status.phase == 'Running'"
+  retries: 20
+  delay: 5
+  with_sequence: start=1 end="{{ group.number_of_hosts }}"
+
+- name: Expose ports on target hosts
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: "{{ group.name_prefix }}-{{ item }}-svc"
+        namespace: "{{ jenkins_agent_namespace }}"
+      spec:
+        selector:
+          app: "ansible-test-host-{{ group.name_prefix }}-{{ item }}"
+        ports: "{{ group.ports }}"
+    state: present
+  with_sequence: start=1 end="{{ group.number_of_hosts }}"
+
+- name: Get service IP addresses
+  kubernetes.core.k8s_info:
+    kind: Service
+    namespace: "{{ jenkins_agent_namespace }}"
+    name: "{{ group.name_prefix }}-{{ item }}-svc"
+  register: svc_info
+  with_sequence: start=1 end="{{ group.number_of_hosts }}"
+
+- name: Create mapping for pod name to service IPs
+  ansible.builtin.set_fact:
+    pod_to_ip_map: "{{ pod_to_ip_map | default({}) | combine({item.item: item.resources[0].spec.clusterIP}) }}"
+  loop: "{{ svc_info.results }}"
+
+- name: Dynamically add pods to the Ansible in-memory inventory
+  ansible.builtin.add_host:
+    name: "{{ group.name_prefix }}-{{ item }}"
+    ansible_connection: kubernetes.core.kubectl
+    ansible_kubernetes_namespace: "{{ jenkins_agent_namespace }}"
+    ansible_kubernetes_container: target
+    ansible_python_interpreter: /usr/bin/python3.14
+    ansible_kubectl_pod: "{{ group.name_prefix }}-{{ item }}"
+    ansible_host: "{{ pod_to_ip_map[item] }}"
+    groups: "{{ group.group }}"
+  with_sequence: start=1 end="{{ group.number_of_hosts }}"
