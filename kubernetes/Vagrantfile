@@ -10,31 +10,33 @@ Vagrant.configure("2") do |config|
     config.vbguest.installer_options = { allow_kernel_headers: true }
   end
 
+  config.ssh.insert_key = false
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.linked_clone = true
+    # Force the second NIC to use a consistent host-only adapter
+    vb.customize ["modifyvm", :id, "--nic2", "hostonly", "--hostonlyadapter2", "vboxnet5"]
+  end
+
   if Integer(LOAD_BALANCER) == 1
     config.vm.define "lb" do |lb|
       lb.vm.box = "cloud-image/ubuntu-24.04"
       lb.vm.hostname = "lb"
       lb.vm.network "private_network", ip: "192.168.56.10"
-      lb.ssh.insert_key = false
-      lb.vm.synced_folder ".", "/vagrant", disabled: true
       lb.vm.provider "virtualbox" do |vb|
         vb.memory = "512"
-        vb.linked_clone = true
       end
     end
   end
 
   (1..Integer(ETCD_NODES)).each do |i|
     config.vm.define "etcd-#{i}" do |etcd|
-      # etcd.vm.box = "generic/ubuntu2204"
       etcd.vm.box = "cloud-image/ubuntu-24.04"
       etcd.vm.hostname = "etcd-#{i}"
       etcd.vm.network "private_network", ip: "192.168.59.#{i + 9}"
-      etcd.ssh.insert_key = false
-      etcd.vm.synced_folder ".", "/vagrant", disabled: true
       etcd.vm.provider "virtualbox" do |vb|
         vb.memory = "1024"
-        vb.linked_clone = true
       end
     end
   end
@@ -44,11 +46,8 @@ Vagrant.configure("2") do |config|
       control.vm.box = "generic/ubuntu2204"
       control.vm.hostname = "control-#{i}"
       control.vm.network "private_network", ip: "192.168.57.#{i + 9}"
-      control.ssh.insert_key = false
-      control.vm.synced_folder ".", "/vagrant", disabled: true
       control.vm.provider "virtualbox" do |vb|
         vb.memory = "2048"
-        vb.linked_clone = true
       end
     end
   end
@@ -58,11 +57,8 @@ Vagrant.configure("2") do |config|
       worker.vm.box = "generic/ubuntu2204"
       worker.vm.hostname = "worker-#{i}"
       worker.vm.network "private_network", ip: "192.168.58.#{i + 9}"
-      worker.ssh.insert_key = false
-      worker.vm.synced_folder ".", "/vagrant", disabled: true
       worker.vm.provider "virtualbox" do |vb|
         vb.memory = "2048"
-        vb.linked_clone = true
       end
     end
   end
