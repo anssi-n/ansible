@@ -99,32 +99,21 @@
         msg: "{{ hostvars[item] }}"
       loop: "{{ pod_names }}"
 
-# - name: Run Playbook Tests Against Dynamic Pods
-#   hosts: dynamic_targets
-#   gather_facts: false
-#   become: true
+- name: Run Playbook Tests Against Dynamic Pods
+  hosts: etcd_nodes
+  gather_facts: true
 
-#   tasks:
-#     - name: Test raw command inside the Kubernetes pod
-#       ansible.builtin.raw: hostname
-#       changed_when: false
+  tasks:
+    - name: Virtualization type
+      ansible.builtin.debug:
+        var: ansible_facts["virtualization_type"]
 
-#     - name: Test command plugin inside the Kubernetes pod
-#       ansible.builtin.command: hostname
-#       changed_when: false
+    - name: Virtualization role
+      ansible.builtin.debug:
+        var: ansible_facts["virtualization_role"]
 
-#     - name: Test shell plugin inside the Kubernetes pod
-#       ansible.builtin.shell: >
-#         hostname
-#       changed_when: false
-
-#     - name: Test apt plugin inside the Kubernetes pod
-#       ansible.builtin.apt:
-#         name: nginx
-#         state: present
-
-- name: Include a play after another play
-  ansible.builtin.import_playbook: ../kubernetes/install-k8s.yaml
+# - name: Include a play after another play
+#   ansible.builtin.import_playbook: ../kubernetes/install-k8s.yaml
 
 - name: Teardown Infrastructure
   hosts: localhost
