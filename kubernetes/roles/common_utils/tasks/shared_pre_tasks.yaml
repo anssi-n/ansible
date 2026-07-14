@@ -1,0 +1,5 @@
+- name: Determine if the host is a container
+  ansible.builtin.set_fact:
+    common_utils_host_is_container:
+      "{{ ansible_facts['virtualization_type'] in ['docker', 'lxc', 'podman', 'containerd', 'container'] \
+      and ansible_facts['virtualization_role'] == 'guest' }}"

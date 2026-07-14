@@ -15,39 +15,40 @@
     backup: true
   when: ansible_facts["swaptotal_mb"] > 0
 
-# Load required kernel modules
+- name: Set required kernel modules and parameters if not in container
+  when: not common_utils_host_is_container
+  block:
+    # Load required kernel modules unless
+    - name: Load overlay kernel module
+      community.general.modprobe:
+        name: overlay
+        state: present
+        persistent: present
 
-- name: Load overlay kernel module
-  community.general.modprobe:
-    name: overlay
-    state: present
-    persistent: present
+    - name: Load br_netfilter kernel module
+      community.general.modprobe:
+        name: br_netfilter
+        state: present
+        persistent: present
 
-- name: Load br_netfilter kernel module
-  community.general.modprobe:
-    name: br_netfilter
-    state: present
-    persistent: present
+    # Set required kernel parameters
+    - name: Set net.bridge.bridge-nf-call-iptables
+      ansible.posix.sysctl:
+        name: net.bridge.bridge-nf-call-iptables
+        value: "1"
+        state: present
 
-# Set required kernel parameters
+    - name: Set net.bridge.bridge-nf-call-iptables
+      ansible.posix.sysctl:
+        name: net.bridge.bridge-nf-call-ip6tables
+        value: "1"
+        state: present
 
-- name: Set net.bridge.bridge-nf-call-iptables
-  ansible.posix.sysctl:
-    name: net.bridge.bridge-nf-call-iptables
-    value: "1"
-    state: present
-
-- name: Set net.bridge.bridge-nf-call-iptables
-  ansible.posix.sysctl:
-    name: net.bridge.bridge-nf-call-ip6tables
-    value: "1"
-    state: present
-
-- name: Set net.bridge.bridge-nf-call-iptables
-  ansible.posix.sysctl:
-    name: net.ipv4.ip_forward
-    value: "1"
-    state: present
+    - name: Set net.bridge.bridge-nf-call-iptables
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        state: present
 
 # Install kubeadm, kubelet and kubectl
 

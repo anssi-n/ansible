@@ -7,6 +7,10 @@
   vars_files:
     - k8s_vars.yaml
 
+  pre_tasks:
+    - name: Run shared pre-tasks from common role
+      ansible.builtin.import_tasks: roles/common_utils/tasks/shared_pre_tasks.yaml
+
   roles:
     - role: lb_setup
     - role: install_helm
@@ -21,6 +25,10 @@
 
   vars_files:
     - k8s_vars.yaml
+
+  pre_tasks:
+    - name: Run shared pre-tasks from common role
+      ansible.builtin.import_tasks: roles/common_utils/tasks/shared_pre_tasks.yaml
 
   roles:
     - role: containerd
@@ -37,6 +45,10 @@
 
   vars_files:
     - k8s_vars.yaml
+
+  pre_tasks:
+    - name: Run shared pre-tasks from common role
+      ansible.builtin.import_tasks: roles/common_utils/tasks/shared_pre_tasks.yaml
 
   roles:
     - setup_etcd_cluster
@@ -64,6 +76,10 @@
   vars_files:
     - k8s_vars.yaml
 
+  pre_tasks:
+    - name: Run shared pre-tasks from common role
+      ansible.builtin.import_tasks: roles/common_utils/tasks/shared_pre_tasks.yaml
+
   roles:
     - role: join_control
     - role: install_helm
@@ -77,6 +93,10 @@
   vars_files:
     - k8s_vars.yaml
 
+  pre_tasks:
+    - name: Run shared pre-tasks from common role
+      ansible.builtin.import_tasks: roles/common_utils/tasks/shared_pre_tasks.yaml
+
   roles:
     - join_worker
 
@@ -87,6 +107,10 @@
 
   vars_files:
     - k8s_vars.yaml
+
+  pre_tasks:
+    - name: Run shared pre-tasks from common role
+      ansible.builtin.import_tasks: roles/common_utils/tasks/shared_pre_tasks.yaml
 
   roles:
     - role: encrypt_etcd_at_rest
@@ -99,6 +123,10 @@
 
   vars_files:
     - k8s_vars.yaml
+
+  pre_tasks:
+    - name: Run shared pre-tasks from common role
+      ansible.builtin.import_tasks: roles/common_utils/tasks/shared_pre_tasks.yaml
 
 - name: Extra configuration for all cluster nodes
   hosts: k8s_cluster
@@ -123,6 +151,9 @@
     - k8s_vars.yaml
 
   pre_tasks:
+    - name: Run shared pre-tasks from common role
+      ansible.builtin.import_tasks: roles/common_utils/tasks/shared_pre_tasks.yaml
+
     - name: Get Github pat from Hashicorp Vault
       community.hashi_vault.vault_kv2_get:
         url: "{{ lookup('env', 'VAULT_ADDR') }}"

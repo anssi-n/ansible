@@ -122,8 +122,8 @@
       ansible.builtin.debug:
         var: common_utils_host_is_container
 
-# - name: Include a play after another play
-#   ansible.builtin.import_playbook: ../kubernetes/install-k8s.yaml
+- name: Include a play after another play
+  ansible.builtin.import_playbook: ../kubernetes/install-k8s.yaml
 
 - name: Teardown Infrastructure
   hosts: localhost
