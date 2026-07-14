@@ -104,6 +104,12 @@
   gather_facts: true
 
   tasks:
+    - name: Determine if the host is a container
+      ansible.builtin.set_fact:
+        common_utils_host_is_container:
+          "{{ ansible_facts['virtualization_type'] in ['docker', 'lxc', 'podman', 'containerd', 'container'] and
+          ansible_facts['virtualization_role'] == 'guest' }}"
+
     - name: Virtualization type
       ansible.builtin.debug:
         var: ansible_facts["virtualization_type"]
@@ -111,6 +117,10 @@
     - name: Virtualization role
       ansible.builtin.debug:
         var: ansible_facts["virtualization_role"]
+
+    - name: In container?
+      ansible.builtin.debug:
+        var: common_utils_host_is_container
 
 # - name: Include a play after another play
 #   ansible.builtin.import_playbook: ../kubernetes/install-k8s.yaml
